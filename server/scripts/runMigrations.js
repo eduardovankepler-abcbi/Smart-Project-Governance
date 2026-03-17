@@ -15,6 +15,32 @@ if (optionalEnvPath) {
   require("dotenv").config({ path: optionalEnvPath, override: true });
 }
 
+async function ensureBaseSchema(connection) {
+  const requiredTables = ["users", "projetos", "tarefas", "task_assignments", "recursos"];
+  const placeholders = requiredTables.map(() => "?").join(", ");
+  const [existingRows] = await connection.query(
+    `SELECT TABLE_NAME
+       FROM INFORMATION_SCHEMA.TABLES
+      WHERE TABLE_SCHEMA = DATABASE()
+        AND TABLE_NAME IN (${placeholders})`,
+    requiredTables
+  );
+
+  if (existingRows.length === requiredTables.length) return;
+
+  console.log("Base schema not found. Bootstrapping schema.sql...");
+
+  const schemaPath = path.resolve(__dirname, "..", "database", "schema.sql");
+  let schemaSql = fs.readFileSync(schemaPath, "utf8");
+
+  schemaSql = schemaSql
+    .replace(/CREATE DATABASE IF NOT EXISTS[\s\S]*?USE\s+[^\n;]+;\s*/i, "")
+    .replace(/DROP TABLE IF EXISTS schema_migrations;\s*CREATE TABLE schema_migrations\s*\([\s\S]*?\)\s*ENGINE=InnoDB;\s*/i, "");
+
+  await connection.query(schemaSql);
+  console.log("Base schema bootstrap completed.");
+}
+
 async function main() {
   const migrationsDir = path.resolve(__dirname, "..", "database", "migrations", "mysql");
   if (!fs.existsSync(migrationsDir)) {
@@ -33,6 +59,8 @@ async function main() {
   });
 
   try {
+    await ensureBaseSchema(connection);
+
     await connection.query(`
       CREATE TABLE IF NOT EXISTS schema_migrations (
         id INT AUTO_INCREMENT PRIMARY KEY,
