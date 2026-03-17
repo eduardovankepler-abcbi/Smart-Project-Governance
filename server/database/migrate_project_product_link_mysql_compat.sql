@@ -1,0 +1,17 @@
+SET @sql = IF(
+  EXISTS(SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'projetos' AND COLUMN_NAME = 'produto_id'),
+  'SELECT 1',
+  "ALTER TABLE projetos ADD COLUMN produto_id INT NULL AFTER business_unit_nome"
+);
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @sql = IF(
+  EXISTS(SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'projetos' AND COLUMN_NAME = 'produto_nome'),
+  'SELECT 1',
+  "ALTER TABLE projetos ADD COLUMN produto_nome VARCHAR(160) NOT NULL DEFAULT '' AFTER produto_id"
+);
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+UPDATE projetos
+SET produto_nome = ''
+WHERE produto_nome IS NULL;

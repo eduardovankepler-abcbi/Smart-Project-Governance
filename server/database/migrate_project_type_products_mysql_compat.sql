@@ -1,0 +1,17 @@
+SET @sql = IF(
+  EXISTS(SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'projetos' AND COLUMN_NAME = 'project_type'),
+  'SELECT 1',
+  "ALTER TABLE projetos ADD COLUMN project_type VARCHAR(30) NOT NULL DEFAULT 'Projeto' AFTER project_code"
+);
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @sql = IF(
+  EXISTS(SELECT 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'produtos'),
+  'SELECT 1',
+  "CREATE TABLE produtos (id INT AUTO_INCREMENT PRIMARY KEY, nome VARCHAR(160) NOT NULL, business_unit_id INT NOT NULL, business_unit_nome VARCHAR(120) NOT NULL DEFAULT 'Corporativo') ENGINE=InnoDB"
+);
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+UPDATE projetos
+SET project_type = 'Projeto'
+WHERE project_type IS NULL OR project_type = '';

@@ -1,0 +1,47 @@
+ALTER TABLE projetos ADD COLUMN IF NOT EXISTS project_code VARCHAR(50) NOT NULL DEFAULT 'PRJ-MIGRATE';
+
+ALTER TABLE recursos ADD COLUMN IF NOT EXISTS external_id VARCHAR(50) DEFAULT '';
+ALTER TABLE recursos ADD COLUMN IF NOT EXISTS seniority VARCHAR(50) DEFAULT '';
+ALTER TABLE recursos ADD COLUMN IF NOT EXISTS specialties_json TEXT;
+ALTER TABLE recursos ADD COLUMN IF NOT EXISTS resource_type VARCHAR(20) DEFAULT 'work';
+ALTER TABLE recursos ADD COLUMN IF NOT EXISTS initials VARCHAR(20) DEFAULT '';
+ALTER TABLE recursos ADD COLUMN IF NOT EXISTS max_units DECIMAL(6,2) DEFAULT 1;
+ALTER TABLE recursos ADD COLUMN IF NOT EXISTS standard_rate DECIMAL(12,2) DEFAULT 0;
+ALTER TABLE recursos ADD COLUMN IF NOT EXISTS overtime_rate DECIMAL(12,2) DEFAULT 0;
+ALTER TABLE recursos ADD COLUMN IF NOT EXISTS email VARCHAR(200) DEFAULT '';
+
+ALTER TABLE tarefas ADD COLUMN IF NOT EXISTS external_id VARCHAR(50) DEFAULT '';
+ALTER TABLE tarefas ADD COLUMN IF NOT EXISTS wbs VARCHAR(50) DEFAULT '';
+ALTER TABLE tarefas ADD COLUMN IF NOT EXISTS outline_level INT DEFAULT 1;
+ALTER TABLE tarefas ADD COLUMN IF NOT EXISTS sort_order INT DEFAULT 0;
+ALTER TABLE tarefas ADD COLUMN IF NOT EXISTS task_type VARCHAR(30) DEFAULT 'fixed_units';
+ALTER TABLE tarefas ADD COLUMN IF NOT EXISTS is_milestone TINYINT(1) DEFAULT 0;
+ALTER TABLE tarefas ADD COLUMN IF NOT EXISTS duration_minutes INT DEFAULT 0;
+ALTER TABLE tarefas ADD COLUMN IF NOT EXISTS is_manual TINYINT(1) DEFAULT 0;
+ALTER TABLE tarefas ADD COLUMN IF NOT EXISTS constraint_type VARCHAR(50) DEFAULT '';
+ALTER TABLE tarefas ADD COLUMN IF NOT EXISTS constraint_date VARCHAR(20) DEFAULT '';
+ALTER TABLE tarefas ADD COLUMN IF NOT EXISTS notes TEXT;
+
+CREATE TABLE IF NOT EXISTS task_assignments (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  task_id VARCHAR(20) NOT NULL,
+  resource_id INT NULL,
+  resource_name VARCHAR(100) DEFAULT '',
+  units DECIMAL(8,4) DEFAULT 1,
+  work DECIMAL(10,2) DEFAULT 0,
+  actual_work DECIMAL(10,2) DEFAULT 0,
+  remaining_work DECIMAL(10,2) DEFAULT 0,
+  cost DECIMAL(12,2) DEFAULT 0,
+  INDEX idx_task_assignments_task (task_id),
+  INDEX idx_task_assignments_resource (resource_id)
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS task_dependencies (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  task_id VARCHAR(20) NOT NULL,
+  predecessor_task_id VARCHAR(20) NOT NULL,
+  dependency_type VARCHAR(10) DEFAULT 'FS',
+  lag_minutes INT DEFAULT 0,
+  INDEX idx_task_dependencies_task (task_id),
+  INDEX idx_task_dependencies_predecessor (predecessor_task_id)
+) ENGINE=InnoDB;
