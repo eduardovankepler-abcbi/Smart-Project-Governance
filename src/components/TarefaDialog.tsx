@@ -17,7 +17,6 @@ import { getTaskPredecessorLabel, getTaskResourceLabel } from "@/utils/projectMo
 import {
   MAX_TASK_WBS_DEPTH,
   buildTaskDisplayLabel,
-  buildTaskIndentLabel,
   generateTaskIdentifiers,
   getTaskBusinessId,
   getTaskDisplayHierarchy,
@@ -136,6 +135,28 @@ export default function TarefaDialog({ open, onOpenChange, tarefa, defaultParent
     if (!form.projeto) return [];
     return tarefas.filter((item) => item.projeto === form.projeto && getTaskHierarchyDepth(item) < MAX_TASK_WBS_DEPTH && item.id !== form.id);
   }, [tarefas, form.projeto, form.id]);
+
+  const groupedAvailableParents = useMemo(() => {
+    const groups = new Map<string, Tarefa[]>();
+    availableParents
+      .slice()
+      .sort((a, b) => {
+        const hierarchyCompare = getTaskDisplayHierarchy(a).localeCompare(getTaskDisplayHierarchy(b), undefined, { numeric: true });
+        if (hierarchyCompare !== 0) return hierarchyCompare;
+        return a.tarefa.localeCompare(b.tarefa);
+      })
+      .forEach((task) => {
+        const current = groups.get(task.projeto) || [];
+        current.push(task);
+        groups.set(task.projeto, current);
+      });
+    return Array.from(groups.entries());
+  }, [availableParents]);
+
+  const selectedParentTask = useMemo(
+    () => availableParents.find((item) => item.id === form.parentId) || tarefas.find((item) => item.id === form.parentId) || null,
+    [availableParents, tarefas, form.parentId]
+  );
 
   const handleParentChange = (parentId: string) => {
     const actualParentId = parentId === "__none__" ? "" : parentId;
@@ -257,6 +278,26 @@ export default function TarefaDialog({ open, onOpenChange, tarefa, defaultParent
     setLegacyResourceNames((current) => current.filter((name) => name !== resourceName));
   };
 
+  const renderParentTaskSummary = (task: Tarefa) => {
+    const level = getTaskHierarchyDepth(task);
+    const paddingLeft = Math.max(level - 1, 0) * 16;
+    return (
+      <div className="flex w-full items-start gap-3" style={{ paddingLeft: `${paddingLeft}px` }}>
+        <div className="flex-1">
+          <div className="flex items-center gap-2">
+            <span className="font-medium">{task.tarefa}</span>
+            <Badge variant="outline" className="font-mono">ID {getTaskBusinessId(task)}</Badge>
+            <Badge variant="outline" className="font-mono">WBS {getTaskDisplayHierarchy(task)}</Badge>
+            <Badge variant="secondary">Nível {level}</Badge>
+          </div>
+          <p className="mt-1 text-xs text-muted-foreground">
+            {task.parentId ? `Pai: ${task.parentId}` : "Tarefa raiz do projeto"} · Pode receber subtarefa
+          </p>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="max-w-4xl max-h-[85vh] overflow-y-auto">
@@ -275,17 +316,46 @@ export default function TarefaDialog({ open, onOpenChange, tarefa, defaultParent
           {mode === "subtask" ? (
             <div>
               <Label>Tarefa Pai *</Label>
-              <Select value={form.parentId || "__none__"} onValueChange={handleParentChange} disabled={!form.projeto || !!defaultParentId || isEdit}>
-                <SelectTrigger><SelectValue placeholder="Selecione a tarefa pai" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="__none__">Selecione a tarefa pai</SelectItem>
-                  {availableParents.map((item) => (
-                    <SelectItem key={item.id} value={item.id}>
-                      {buildTaskIndentLabel(item)}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className="w-full justify-between"
+                    disabled={!form.projeto || !!defaultParentId || isEdit || availableParents.length === 0}
+                  >
+                    <span className="truncate text-left">
+                      {selectedParentTask
+                        ? buildTaskDisplayLabel(selectedParentTask)
+                        : !form.projeto
+                          ? "Selecione o projeto para habilitar a hierarquia"
+                          : availableParents.length === 0
+                            ? "Nenhuma tarefa elegível para receber subtarefa"
+                            : "Selecione a tarefa pai"}
+                    </span>
+                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[560px] p-0" align="start">
+                  <Command>
+                    <CommandInput placeholder="Buscar por nome, ID ou WBS..." />
+                    <CommandList>
+                      <CommandEmpty>Nenhuma tarefa elegível encontrada.</CommandEmpty>
+                      {groupedAvailableParents.map(([projectName, tasksInProject]) => (
+                        <CommandGroup key={projectName} heading={`Projeto ${projectName}`}>
+                          {tasksInProject.map((item) => (
+                            <CommandItem key={item.id} value={`${projectName} ${item.tarefa} ${getTaskBusinessId(item)} ${getTaskDisplayHierarchy(item)}`} onSelect={() => handleParentChange(item.id)}>
+                              {renderParentTaskSummary(item)}
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      ))}
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Apenas tarefas do mesmo projeto e com menos de {MAX_TASK_WBS_DEPTH} níveis aparecem aqui. Isso evita subtarefas em níveis inválidos ou associações ambíguas.
+              </p>
             </div>
           ) : (
             <div>
