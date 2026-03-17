@@ -8,8 +8,78 @@ function asArray(value) {
   return Array.isArray(value) ? value : [value];
 }
 
-function depthFromId(id) {
-  return String(id || "").split(".").length - 1;
+const MAX_WBS_DEPTH = 5;
+
+function parseWbsSegments(value) {
+  return String(value || "")
+    .split(".")
+    .map((segment) => parseInt(segment, 10))
+    .filter((segment) => Number.isFinite(segment) && segment > 0);
+}
+
+function depthFromCode(code) {
+  return parseWbsSegments(code).length;
+}
+
+function getTaskHierarchyCode(task) {
+  return sanitizeString(task.wbs, 50) || sanitizeString(task.id, 20);
+}
+
+function getNextTaskSequence(tasks = []) {
+  const numericIds = tasks
+    .map((task, index) => {
+      const explicit = parseInt(task.external_id, 10);
+      if (Number.isFinite(explicit) && explicit > 0) return explicit;
+      return index + 1;
+    });
+  return (numericIds.length ? Math.max(...numericIds) : 0) + 1;
+}
+
+function buildInternalTaskId(projectId, sequence) {
+  return `${projectId}-${sequence}`;
+}
+
+function buildNextRootWbs(tasks = []) {
+  const current = tasks
+    .filter((task) => !task.parent_id)
+    .map((task) => parseWbsSegments(getTaskHierarchyCode(task))[0] || 0);
+  return String((current.length ? Math.max(...current) : 0) + 1);
+}
+
+function buildNextChildWbs(parentTask, tasks = []) {
+  const parentWbs = getTaskHierarchyCode(parentTask);
+  const current = tasks
+    .filter((task) => task.parent_id === parentTask.id)
+    .map((task) => {
+      const segments = parseWbsSegments(getTaskHierarchyCode(task));
+      return segments[segments.length - 1] || 0;
+    });
+  return `${parentWbs}.${(current.length ? Math.max(...current) : 0) + 1}`;
+}
+
+async function loadProjectTaskContext(conn, projeto) {
+  const [projectRows] = await conn.query("SELECT id, project_code, projeto FROM projetos WHERE projeto = ? LIMIT 1", [projeto]);
+  if (!projectRows.length) return null;
+  const [taskRows] = await conn.query("SELECT id, parent_id, external_id, wbs, projeto FROM tarefas WHERE projeto = ? ORDER BY sort_order, id", [projeto]);
+  return { project: projectRows[0], tasks: taskRows };
+}
+
+function buildTaskIdentifiers(context, parentTask = null) {
+  const sequence = getNextTaskSequence(context.tasks);
+  const wbs = parentTask ? buildNextChildWbs(parentTask, context.tasks) : buildNextRootWbs(context.tasks);
+  const outlineLevel = depthFromCode(wbs);
+
+  if (outlineLevel > MAX_WBS_DEPTH) {
+    return { error: `Máximo de ${MAX_WBS_DEPTH} níveis de subtarefa permitidos` };
+  }
+
+  return {
+    id: buildInternalTaskId(context.project.id, sequence),
+    externalId: String(sequence),
+    wbs,
+    outlineLevel,
+    sortOrder: sequence,
+  };
 }
 
 async function loadTaskRelations(pool) {
@@ -151,29 +221,37 @@ module.exports = function (pool, auth, taskHooks = {}) {
     const conn = await pool.getConnection();
     try {
       const b = req.body;
-      const id = sanitizeString(b.id, 20);
-      if (!id) return res.status(400).json({ error: "ID é obrigatório" });
+      const projeto = sanitizeString(b.projeto, 200);
+      if (!projeto) return res.status(400).json({ error: "Projeto é obrigatório" });
       if (req.authUser.role === "pmo") {
         const access = await getAccessibleProjectNamesFilter(req.authUser);
-        if (!access.projectNames.includes(sanitizeString(b.projeto, 200))) {
+        if (!access.projectNames.includes(projeto)) {
           return res.status(403).json({ error: "Sem acesso a este projeto", code: "TASK_PROJECT_ACCESS_DENIED" });
         }
       }
 
       const parentId = sanitizeString(b.parentId, 20);
+      const context = await loadProjectTaskContext(conn, projeto);
+      if (!context) return res.status(400).json({ error: "Projeto inválido" });
+      const parentTask = parentId ? context.tasks.find((task) => task.id === parentId) : null;
+
       if (parentId) {
-        const depth = depthFromId(id);
-        if (depth > 3) return res.status(400).json({ error: "Máximo de 3 níveis de subtarefa permitidos" });
-        const [parentRows] = await conn.query("SELECT id FROM tarefas WHERE id = ?", [parentId]);
-        if (!parentRows.length) return res.status(400).json({ error: "Tarefa pai não encontrada" });
+        if (!parentTask) return res.status(400).json({ error: "Tarefa pai não encontrada" });
+        if (parentTask.projeto !== projeto) return res.status(400).json({ error: "A tarefa pai deve pertencer ao mesmo projeto" });
       }
+
+      const generated = buildTaskIdentifiers(context, parentTask);
+      if (generated.error) return res.status(400).json({ error: generated.error });
+
+      const id = sanitizeString(b.id, 20) || generated.id;
 
       const assignments = await normalizeAssignments(conn, b.assignments, b.responsavel, b.funcao);
       const dependencies = normalizeDependencies(b.predecessors);
       const responsavel = assignments.map((assignment) => assignment.resourceName).filter(Boolean).join("; ") || sanitizeString(b.responsavel, 500);
       const funcao = sanitizeString(b.funcao || assignments[0]?.resourceRole, 200);
-      const wbs = sanitizeString(b.wbs, 50) || id;
-      const outlineLevel = sanitizeInt(b.outlineLevel, depthFromId(id) + 1);
+      const externalId = sanitizeString(b.externalId, 50) || generated.externalId;
+      const wbs = sanitizeString(b.wbs, 50) || generated.wbs;
+      const outlineLevel = sanitizeInt(b.outlineLevel, generated.outlineLevel);
       const dataInicioPlanej = sanitizeString(b.dataInicioPlanej, 20);
       const dataFimPlanej = sanitizeString(b.dataFimPlanej, 20);
       const dataInicioReal = sanitizeString(b.dataInicioReal, 20);
@@ -190,11 +268,11 @@ module.exports = function (pool, auth, taskHooks = {}) {
         [
           id,
           parentId || null,
-          sanitizeString(b.externalId, 50),
+          externalId,
           wbs,
           outlineLevel,
-          sanitizeInt(b.sortOrder),
-          sanitizeString(b.projeto, 200),
+          sanitizeInt(b.sortOrder, generated.sortOrder),
+          projeto,
           sanitizeString(b.tarefa, 500),
           sanitizeString(b.subtarefa, 500),
           responsavel,
@@ -286,24 +364,39 @@ module.exports = function (pool, auth, taskHooks = {}) {
       const [beforeTaskRows] = await conn.query("SELECT * FROM tarefas WHERE id = ?", [req.params.id]);
       const [beforeAssignmentRows] = await conn.query("SELECT * FROM task_assignments WHERE task_id = ? ORDER BY id", [req.params.id]);
       const [beforeDependencyRows] = await conn.query("SELECT * FROM task_dependencies WHERE task_id = ? ORDER BY id", [req.params.id]);
+      if (!beforeTaskRows.length) return res.status(404).json({ error: "Tarefa não encontrada" });
       if (req.authUser.role === "pmo") {
-        const [existingRows] = await conn.query("SELECT projeto FROM tarefas WHERE id = ?", [req.params.id]);
-        if (!existingRows.length) return res.status(404).json({ error: "Tarefa não encontrada" });
         const access = await getAccessibleProjectNamesFilter(req.authUser);
-        const nextProject = sanitizeString(b.projeto, 200) || existingRows[0].projeto;
-        if (!access.projectNames.includes(existingRows[0].projeto) || !access.projectNames.includes(nextProject)) {
+        const nextProject = sanitizeString(b.projeto, 200) || beforeTaskRows[0].projeto;
+        if (!access.projectNames.includes(beforeTaskRows[0].projeto) || !access.projectNames.includes(nextProject)) {
           return res.status(403).json({ error: "Sem acesso a este projeto", code: "TASK_PROJECT_ACCESS_DENIED" });
         }
+      }
+      const requestedParentId = sanitizeString(b.parentId, 20);
+      const [childRows] = await conn.query("SELECT id FROM tarefas WHERE parent_id = ? LIMIT 1", [req.params.id]);
+      if (requestedParentId !== (beforeTaskRows[0].parent_id || "") && childRows.length) {
+        return res.status(400).json({ error: "Reparentear tarefas com subtarefas ainda não é suportado. Ajuste a hierarquia começando pelos níveis inferiores." });
       }
       const assignments = await normalizeAssignments(conn, b.assignments, b.responsavel, b.funcao);
       const dependencies = normalizeDependencies(b.predecessors);
       const responsavel = assignments.map((assignment) => assignment.resourceName).filter(Boolean).join("; ") || sanitizeString(b.responsavel, 500);
       const funcao = sanitizeString(b.funcao || assignments[0]?.resourceRole, 200);
+      const nextProject = sanitizeString(b.projeto, 200) || beforeTaskRows[0].projeto;
+      const context = await loadProjectTaskContext(conn, nextProject);
+      const parentTask = requestedParentId
+        ? context?.tasks.find((task) => task.id === requestedParentId)
+        : null;
+      if (requestedParentId && !parentTask) return res.status(400).json({ error: "Tarefa pai não encontrada" });
+      if (parentTask && parentTask.id === req.params.id) return res.status(400).json({ error: "A tarefa não pode ser pai dela mesma" });
       const dataInicioPlanej = sanitizeString(b.dataInicioPlanej, 20);
       const dataFimPlanej = sanitizeString(b.dataFimPlanej, 20);
       const dataInicioReal = sanitizeString(b.dataInicioReal, 20);
       const dataFimReal = sanitizeString(b.dataFimReal, 20);
       const constraintDate = sanitizeString(b.constraintDate, 20);
+      const nextWbs = sanitizeString(b.wbs, 50) || beforeTaskRows[0].wbs || beforeTaskRows[0].id;
+      if (depthFromCode(nextWbs) > MAX_WBS_DEPTH) {
+        return res.status(400).json({ error: `Máximo de ${MAX_WBS_DEPTH} níveis de subtarefa permitidos` });
+      }
 
       await conn.beginTransaction();
       await conn.query(
@@ -314,12 +407,12 @@ module.exports = function (pool, auth, taskHooks = {}) {
              valor_gasto=?, dias_planejados=?, dias_real=?, dias_completados=?
          WHERE id=?`,
         [
-          sanitizeString(b.parentId, 20) || null,
-          sanitizeString(b.externalId, 50),
-          sanitizeString(b.wbs, 50) || req.params.id,
-          sanitizeInt(b.outlineLevel, depthFromId(req.params.id) + 1),
-          sanitizeInt(b.sortOrder),
-          sanitizeString(b.projeto, 200),
+          requestedParentId || null,
+          sanitizeString(b.externalId, 50) || beforeTaskRows[0].external_id || "",
+          nextWbs,
+          sanitizeInt(b.outlineLevel, depthFromCode(nextWbs) || 1),
+          sanitizeInt(b.sortOrder, beforeTaskRows[0].sort_order || 0),
+          nextProject,
           sanitizeString(b.tarefa, 500),
           sanitizeString(b.subtarefa, 500),
           responsavel,

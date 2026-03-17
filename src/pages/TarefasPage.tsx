@@ -16,6 +16,7 @@ import TarefaDialog from "@/components/TarefaDialog";
 import DeleteDialog from "@/components/DeleteDialog";
 import type { Tarefa } from "@/data/projectData";
 import { formatDurationHours, getTaskPredecessorLabel, getTaskResourceLabel, getTaskResourceNames } from "@/utils/projectModel";
+import { getTaskBusinessId, getTaskDisplayHierarchy, MAX_TASK_WBS_DEPTH } from "@/utils/taskIdentity";
 
 function StatusDot({ status }: { status: string }) {
   const color = getStatusColor(status);
@@ -181,8 +182,8 @@ export default function TarefasPage() {
   };
 
   const canAddSubtask = (t: Tarefa): boolean => {
-    const depth = t.id.split(".").length - 1;
-    return depth < 3;
+    const depth = getTaskDisplayHierarchy(t).split(".").length;
+    return depth < MAX_TASK_WBS_DEPTH;
   };
 
   const handleAddSubtask = (parent: Tarefa) => {
@@ -200,14 +201,14 @@ export default function TarefasPage() {
   };
 
   const handleExportPdf = () => {
-    const headers = ["WBS", "Pai", "Projeto", "Tarefa", "Recursos", "Pred.", "Duração", "%", "Status"];
-    const rows = filtered.map(t => [t.wbs || t.id, t.parentId || "—", t.projeto, t.tarefa, getTaskResourceLabel(t), getTaskPredecessorLabel(t), formatDurationHours(t.durationMinutes || 0), `${t.percentual}%`, t.status]);
+    const headers = ["ID", "WBS", "Pai", "Projeto", "Tarefa", "Recursos", "Pred.", "Duração", "%", "Status"];
+    const rows = filtered.map(t => [getTaskBusinessId(t), getTaskDisplayHierarchy(t), t.parentId || "—", t.projeto, t.tarefa, getTaskResourceLabel(t), getTaskPredecessorLabel(t), formatDurationHours(t.durationMinutes || 0), `${t.percentual}%`, t.status]);
     exportToPdf("Relatório de Tarefas", headers, rows, "tarefas");
   };
 
   const handleExportExcel = () => {
-    const headers = ["WBS", "Pai", "Projeto", "Tarefa", "Recursos", "Predecessoras", "Duração (h)", "%", "Status"];
-    const rows = filtered.map(t => [t.wbs || t.id, t.parentId || "", t.projeto, t.tarefa, getTaskResourceLabel(t), getTaskPredecessorLabel(t), (t.durationMinutes || 0) / 60, t.percentual, t.status]);
+    const headers = ["ID", "WBS", "Pai", "Projeto", "Tarefa", "Recursos", "Predecessoras", "Duração (h)", "%", "Status"];
+    const rows = filtered.map(t => [getTaskBusinessId(t), getTaskDisplayHierarchy(t), t.parentId || "", t.projeto, t.tarefa, getTaskResourceLabel(t), getTaskPredecessorLabel(t), (t.durationMinutes || 0) / 60, t.percentual, t.status]);
     exportToExcel(headers, rows, "tarefas", "Tarefas");
   };
 
@@ -270,7 +271,7 @@ export default function TarefasPage() {
             <TableHeader>
               <TableRow className="bg-muted/50">
                 <TableHead className="w-24 text-xs cursor-pointer" onClick={() => toggleSort("id")}>
-                  WBS / ID {sortBy === "id" && <ArrowUpDown size={12} className="inline ml-1" />}
+                  ID / WBS {sortBy === "id" && <ArrowUpDown size={12} className="inline ml-1" />}
                 </TableHead>
                 <TableHead className="text-xs cursor-pointer" onClick={() => toggleSort("projeto")}>
                   Projeto {sortBy === "projeto" && <ArrowUpDown size={12} className="inline ml-1" />}
@@ -308,9 +309,9 @@ export default function TarefasPage() {
                         ) : (
                           <span className="w-5" />
                         )}
-                        {t.wbs || t.id}
+                        {getTaskBusinessId(t)}
                       </div>
-                      <div className="pl-6 text-[10px] text-muted-foreground">{t.id}</div>
+                      <div className="pl-6 text-[10px] text-muted-foreground">WBS {getTaskDisplayHierarchy(t)} · Chave {t.id}</div>
                     </TableCell>
                     <TableCell className="text-xs font-medium">{t.depth === 0 ? t.projeto : ""}</TableCell>
                     <TableCell className="text-xs">

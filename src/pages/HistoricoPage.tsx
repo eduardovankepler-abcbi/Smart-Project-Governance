@@ -13,6 +13,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { MessageSquare, History, Pencil, Trash2 } from "lucide-react";
+import { buildTaskDisplayLabel } from "@/utils/taskIdentity";
 
 function formatDateTime(value?: string) {
   if (!value) return "—";
@@ -171,12 +172,12 @@ export default function HistoricoPage() {
                   {entityType === "tarefa" ? (
                     <Select value={taskId} onValueChange={setTaskId}>
                       <SelectTrigger className="w-72"><SelectValue placeholder="Tarefa" /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">Todas as tarefas</SelectItem>
-                        {filteredTasks.map((item) => (
-                          <SelectItem key={item.id} value={item.id}>{item.wbs || item.id} · {item.tarefa}</SelectItem>
-                        ))}
-                      </SelectContent>
+                        <SelectContent>
+                          <SelectItem value="all">Todas as tarefas</SelectItem>
+                          {filteredTasks.map((item) => (
+                          <SelectItem key={item.id} value={item.id}>{buildTaskDisplayLabel(item)}</SelectItem>
+                          ))}
+                        </SelectContent>
                     </Select>
                   ) : null}
                 </div>

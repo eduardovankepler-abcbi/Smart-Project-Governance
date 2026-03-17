@@ -12,6 +12,7 @@ import RecursoDialog from "@/components/RecursoDialog";
 import BusinessUnitDialog from "@/components/BusinessUnitDialog";
 import ProdutoDialog from "@/components/ProdutoDialog";
 import type { BusinessUnit, Produto, Projeto, Recurso, Tarefa } from "@/data/projectData";
+import { getTaskBusinessId, getTaskDisplayHierarchy, MAX_TASK_WBS_DEPTH } from "@/utils/taskIdentity";
 
 export default function CadastroPage() {
   const { businessUnits, produtos, projetos, tarefas, recursos } = useData();
@@ -237,8 +238,8 @@ export default function CadastroPage() {
           <TabsContent value="tarefas">
             <Card className="border border-border">
               <CardContent className="p-5 space-y-3 text-sm text-muted-foreground">
-                <p>Tarefas e subtarefas com ate 3 niveis de hierarquia, predecessoras, recursos atribuídos, duracao e datas reais.</p>
-                <p>O identificador da tarefa continua independente do `ID do projeto`.</p>
+                <p>Tarefas e subtarefas com até {MAX_TASK_WBS_DEPTH} níveis de hierarquia, predecessoras, recursos atribuídos, duração e datas reais.</p>
+                <p>O ID visível da tarefa é sequencial por projeto e o WBS representa apenas a hierarquia.</p>
                 <p>No cadastro de tarefa raiz, `Tarefa pai` não aparece. No cadastro de subtarefa, o vínculo com a tarefa pai é obrigatório.</p>
                 <div className="flex flex-wrap gap-2 pt-1">
                   <Button size="sm" onClick={openNewTarefa}>Cadastrar Tarefa</Button>
@@ -250,7 +251,8 @@ export default function CadastroPage() {
                       <div className="space-y-1">
                         <div className="flex items-center gap-2">
                           <span className="font-medium text-foreground">{item.tarefa}</span>
-                          <Badge variant="outline" className="font-mono">{item.wbs || item.id}</Badge>
+                          <Badge variant="outline" className="font-mono">ID {getTaskBusinessId(item)}</Badge>
+                          <Badge variant="outline" className="font-mono">WBS {getTaskDisplayHierarchy(item)}</Badge>
                           {item.parentId && <Badge variant="outline">Pai: {item.parentId}</Badge>}
                         </div>
                         <div className="text-xs">

@@ -4,12 +4,27 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import type { Tarefa } from "@/data/projectData";
 import { useToast } from "@/hooks/use-toast";
 import * as api from "@/services/api";
 import { isApiEnabled } from "@/config/api";
 import { useData } from "@/contexts/DataContext";
 import { getTaskPredecessorLabel, getTaskResourceLabel } from "@/utils/projectModel";
+import {
+  MAX_TASK_WBS_DEPTH,
+  buildTaskDisplayLabel,
+  buildTaskIndentLabel,
+  generateTaskIdentifiers,
+  getTaskBusinessId,
+  getTaskDisplayHierarchy,
+  getTaskHierarchyDepth,
+  resolveTaskReference,
+} from "@/utils/taskIdentity";
+import { Check, ChevronsUpDown, X } from "lucide-react";
 
 interface TarefaDialogProps {
   open: boolean;
@@ -28,7 +43,7 @@ const TASK_TYPE_OPTIONS = [
 ];
 
 const emptyTarefa: Tarefa = {
-  id: "", parentId: "", projeto: "", tarefa: "", subtarefa: "", responsavel: "", funcao: "",
+  id: "", externalId: "", parentId: "", projeto: "", tarefa: "", subtarefa: "", responsavel: "", funcao: "",
   dataInicioPlanej: "", esforcoPlanej: 0, dataFimPlanej: "", dataInicioReal: "",
   esforcoReal: 0, dataFimReal: "", percentual: 0, status: "Não iniciado",
   taskType: "fixed_units", milestone: false, durationMinutes: 0, isManual: false,
@@ -37,36 +52,34 @@ const emptyTarefa: Tarefa = {
   assignments: [], predecessors: [],
 };
 
-function getDepth(id: string): number {
-  return id.split(".").length - 1;
-}
-
-function generateNextChildId(parentId: string, existingTarefas: Tarefa[]): string {
-  const children = existingTarefas.filter((item) => item.parentId === parentId);
-  const maxSeq = children.reduce((max, child) => {
-    const parts = child.id.split(".");
-    const lastPart = parseInt(parts[parts.length - 1]) || 0;
-    return Math.max(max, lastPart);
-  }, 0);
-  return `${parentId}.${maxSeq + 1}`;
-}
-
 export default function TarefaDialog({ open, onOpenChange, tarefa, defaultParentId, defaultProjeto, mode = defaultParentId ? "subtask" : "task" }: TarefaDialogProps) {
   const isEdit = !!tarefa;
   const { refreshTarefas, tarefas, recursos, setTarefas, getUniqueProjetos } = useData();
   const { toast } = useToast();
-  const [resourceInput, setResourceInput] = useState("");
   const [predecessorInput, setPredecessorInput] = useState("");
+  const [selectedResourceNames, setSelectedResourceNames] = useState<string[]>([]);
+  const [legacyResourceNames, setLegacyResourceNames] = useState<string[]>([]);
+  const [resourcePickerOpen, setResourcePickerOpen] = useState(false);
 
   const initialForm = (): Tarefa => {
     if (tarefa) return { ...emptyTarefa, ...tarefa };
     const form = { ...emptyTarefa };
     if (defaultProjeto) form.projeto = defaultProjeto;
-    if (defaultParentId) {
-      form.parentId = defaultParentId;
-      form.id = generateNextChildId(defaultParentId, tarefas);
+    if (defaultParentId) form.parentId = defaultParentId;
+    if (defaultParentId && !defaultProjeto) {
       const parent = tarefas.find((item) => item.id === defaultParentId);
       if (parent) form.projeto = parent.projeto;
+    }
+    if (form.projeto) {
+      const generated = generateTaskIdentifiers(form.projeto, form.parentId, tarefas);
+      form.id = generated.id;
+      form.externalId = generated.externalId;
+      form.wbs = generated.wbs;
+      form.outlineLevel = generated.outlineLevel;
+      form.sortOrder = generated.sortOrder;
+    }
+    if (mode === "task") {
+      form.parentId = "";
     }
     return form;
   };
@@ -78,47 +91,75 @@ export default function TarefaDialog({ open, onOpenChange, tarefa, defaultParent
     if (!open) return;
     const nextForm = initialForm();
     setForm(nextForm);
-    setResourceInput(getTaskResourceLabel(nextForm));
     setPredecessorInput(getTaskPredecessorLabel(nextForm));
+    const existingNames = (nextForm.assignments?.length
+      ? nextForm.assignments.map((assignment) => assignment.resourceName)
+      : getTaskResourceLabel(nextForm).split(";").map((item) => item.trim()).filter(Boolean)
+    ).filter(Boolean);
+    const currentResourceNames = new Set(recursos.map((item) => item.nome));
+    setSelectedResourceNames(existingNames.filter((name) => currentResourceNames.has(name)));
+    setLegacyResourceNames(existingNames.filter((name) => !currentResourceNames.has(name)));
   }, [open, tarefa, defaultParentId, defaultProjeto, mode]);
 
   const handleOpenChange = (value: boolean) => {
     if (value) {
       const nextForm = initialForm();
       setForm(nextForm);
-      setResourceInput(getTaskResourceLabel(nextForm));
       setPredecessorInput(getTaskPredecessorLabel(nextForm));
+      const existingNames = (nextForm.assignments?.length
+        ? nextForm.assignments.map((assignment) => assignment.resourceName)
+        : getTaskResourceLabel(nextForm).split(";").map((item) => item.trim()).filter(Boolean)
+      ).filter(Boolean);
+      const currentResourceNames = new Set(recursos.map((item) => item.nome));
+      setSelectedResourceNames(existingNames.filter((name) => currentResourceNames.has(name)));
+      setLegacyResourceNames(existingNames.filter((name) => !currentResourceNames.has(name)));
     }
     onOpenChange(value);
   };
 
   const set = (key: keyof Tarefa, value: string | number | boolean) => setForm((current) => ({ ...current, [key]: value }));
 
+  const regenerateIdentifiers = (projeto: string, parentId: string) => {
+    if (!projeto) return;
+    const generated = generateTaskIdentifiers(projeto, parentId, tarefas);
+    setForm((current) => ({
+      ...current,
+      id: generated.id,
+      externalId: generated.externalId,
+      wbs: generated.wbs,
+      outlineLevel: generated.outlineLevel,
+      sortOrder: generated.sortOrder,
+    }));
+  };
+
   const availableParents = useMemo(() => {
     if (!form.projeto) return [];
-    return tarefas.filter((item) => item.projeto === form.projeto && getDepth(item.id) < 3 && item.id !== form.id);
+    return tarefas.filter((item) => item.projeto === form.projeto && getTaskHierarchyDepth(item) < MAX_TASK_WBS_DEPTH && item.id !== form.id);
   }, [tarefas, form.projeto, form.id]);
 
   const handleParentChange = (parentId: string) => {
     const actualParentId = parentId === "__none__" ? "" : parentId;
     setForm((current) => {
       const updated = { ...current, parentId: actualParentId };
-      if (!isEdit && actualParentId) updated.id = generateNextChildId(actualParentId, tarefas);
       return updated;
     });
+    if (!isEdit) regenerateIdentifiers(form.projeto, actualParentId);
   };
 
   const handleProjetoChange = (projeto: string) => {
-    setForm((current) => ({ ...current, projeto, parentId: "", id: isEdit ? current.id : "" }));
+    setForm((current) => ({ ...current, projeto, parentId: "", id: isEdit ? current.id : "", externalId: isEdit ? current.externalId : "", wbs: isEdit ? current.wbs : "" }));
+    if (!isEdit) regenerateIdentifiers(projeto, "");
   };
 
-  const currentDepth = form.parentId ? getDepth(form.parentId) + 1 : 0;
+  const currentDepth = form.parentId
+    ? Math.max(getTaskHierarchyDepth(availableParents.find((item) => item.id === form.parentId) || ""), 0)
+    : 0;
   const depthLabel = mode === "subtask"
-    ? `Subtarefa ${currentDepth === 0 ? "" : `Nível ${currentDepth}`}`.trim()
+    ? `Subtarefa ${currentDepth === 0 ? "" : `Nível ${currentDepth + 1}`}`.trim()
     : "Tarefa";
 
   const buildAssignments = () => {
-    const names = resourceInput.split(";").map((item) => item.trim()).filter(Boolean);
+    const names = [...selectedResourceNames, ...legacyResourceNames];
     return names.map((name) => {
       const resource = recursos.find((item) => item.nome === name);
       return {
@@ -139,16 +180,17 @@ export default function TarefaDialog({ open, onOpenChange, tarefa, defaultParent
     .filter(Boolean)
     .map((value) => {
       const match = value.match(/^(.+?)(?:\s+\((FS|SS|FF|SF)\))?$/i);
+      const reference = match?.[1]?.trim() || value;
       return {
-        predecessorTaskId: match?.[1]?.trim() || value,
+        predecessorTaskId: resolveTaskReference(reference, form.projeto, tarefas),
         type: (match?.[2] || "FS").toUpperCase(),
         lagMinutes: 0,
       };
     });
 
   const handleSave = async () => {
-    if (!form.id.trim() || !form.tarefa.trim()) {
-      toast({ title: "Erro", description: "ID e nome da tarefa são obrigatórios", variant: "destructive" });
+    if (!form.tarefa.trim()) {
+      toast({ title: "Erro", description: "Nome da tarefa é obrigatório", variant: "destructive" });
       return;
     }
     if (!form.projeto.trim()) {
@@ -163,9 +205,18 @@ export default function TarefaDialog({ open, onOpenChange, tarefa, defaultParent
     const payload: Tarefa = {
       ...form,
       parentId: mode === "task" ? "" : form.parentId,
-      wbs: form.wbs || form.id,
+      wbs: form.wbs || getTaskDisplayHierarchy(form),
       outlineLevel: form.outlineLevel || (mode === "task" ? 1 : currentDepth + 1),
-      responsavel: resourceInput,
+      responsavel: [...selectedResourceNames, ...legacyResourceNames].join("; "),
+      funcao: selectedResourceNames
+        .map((resourceName) => recursos.find((item) => item.nome === resourceName))
+        .filter(Boolean)
+        .map((resource) => {
+          const specialties = (resource?.specialties || []).filter(Boolean);
+          return specialties.length ? `${resource?.nome}: ${specialties.join(", ")}` : resource?.funcao || "";
+        })
+        .filter(Boolean)
+        .join("; "),
       assignments: buildAssignments(),
       predecessors: buildPredecessors(),
     };
@@ -190,6 +241,21 @@ export default function TarefaDialog({ open, onOpenChange, tarefa, defaultParent
   };
 
   const projetos = getUniqueProjetos();
+  const selectedResources = selectedResourceNames
+    .map((name) => recursos.find((item) => item.nome === name))
+    .filter((item): item is NonNullable<typeof item> => !!item);
+
+  const toggleResource = (resourceName: string) => {
+    setSelectedResourceNames((current) =>
+      current.includes(resourceName)
+        ? current.filter((name) => name !== resourceName)
+        : [...current, resourceName]
+    );
+  };
+
+  const removeLegacyResource = (resourceName: string) => {
+    setLegacyResourceNames((current) => current.filter((name) => name !== resourceName));
+  };
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
@@ -201,7 +267,7 @@ export default function TarefaDialog({ open, onOpenChange, tarefa, defaultParent
         <div className="grid grid-cols-2 gap-4 py-4">
           <div>
             <Label>Projeto *</Label>
-            <Select value={form.projeto} onValueChange={handleProjetoChange} disabled={!!defaultProjeto}>
+            <Select value={form.projeto} onValueChange={handleProjetoChange} disabled={!!defaultProjeto || isEdit}>
               <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
               <SelectContent>{projetos.map((projeto) => <SelectItem key={projeto} value={projeto}>{projeto}</SelectItem>)}</SelectContent>
             </Select>
@@ -209,13 +275,13 @@ export default function TarefaDialog({ open, onOpenChange, tarefa, defaultParent
           {mode === "subtask" ? (
             <div>
               <Label>Tarefa Pai *</Label>
-              <Select value={form.parentId || "__none__"} onValueChange={handleParentChange} disabled={!form.projeto || !!defaultParentId}>
+              <Select value={form.parentId || "__none__"} onValueChange={handleParentChange} disabled={!form.projeto || !!defaultParentId || isEdit}>
                 <SelectTrigger><SelectValue placeholder="Selecione a tarefa pai" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="__none__">Selecione a tarefa pai</SelectItem>
                   {availableParents.map((item) => (
                     <SelectItem key={item.id} value={item.id}>
-                      {item.wbs || item.id} - {item.tarefa}
+                      {buildTaskIndentLabel(item)}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -228,12 +294,14 @@ export default function TarefaDialog({ open, onOpenChange, tarefa, defaultParent
             </div>
           )}
           <div>
-            <Label>ID da tarefa *</Label>
-            <Input value={form.id} onChange={(e) => set("id", e.target.value)} disabled={isEdit} placeholder="Ex: 1.2.3" />
+            <Label>ID da tarefa</Label>
+            <Input value={getTaskBusinessId(form)} disabled placeholder="Gerado automaticamente por projeto" />
+            <p className="mt-1 text-xs text-muted-foreground">Sequencial por projeto, independente da hierarquia WBS.</p>
           </div>
           <div>
             <Label>Código WBS</Label>
-            <Input value={form.wbs || form.id} onChange={(e) => set("wbs", e.target.value)} placeholder="Ex: 1.2.3" />
+            <Input value={form.wbs || getTaskDisplayHierarchy(form)} disabled placeholder="Gerado automaticamente pela hierarquia" />
+            <p className="mt-1 text-xs text-muted-foreground">Até {MAX_TASK_WBS_DEPTH} níveis. Ex.: 1, 1.1, 1.1.1.</p>
           </div>
           <div className="col-span-2">
             <Label>Nome da Tarefa *</Label>
@@ -256,12 +324,70 @@ export default function TarefaDialog({ open, onOpenChange, tarefa, defaultParent
           </div>
           <div>
             <Label>Recursos atribuídos</Label>
-            <Input value={resourceInput} onChange={(e) => setResourceInput(e.target.value)} placeholder="Separe os nomes por ponto e vírgula" />
+            <Popover open={resourcePickerOpen} onOpenChange={setResourcePickerOpen}>
+              <PopoverTrigger asChild>
+                <Button variant="outline" className="w-full justify-between">
+                  <span className="truncate text-left">
+                    {selectedResources.length || legacyResourceNames.length
+                      ? `${selectedResources.length + legacyResourceNames.length} recurso(s) selecionado(s)`
+                      : "Selecionar recursos cadastrados"}
+                  </span>
+                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-[420px] p-0" align="start">
+                <Command>
+                  <CommandInput placeholder="Buscar recurso ou especialidade..." />
+                  <CommandList>
+                    <CommandEmpty>Nenhum recurso encontrado.</CommandEmpty>
+                    <CommandGroup>
+                      {recursos.map((resource) => {
+                        const checked = selectedResourceNames.includes(resource.nome);
+                        return (
+                          <CommandItem key={resource.id || resource.nome} value={`${resource.nome} ${(resource.specialties || []).join(" ")}`} onSelect={() => toggleResource(resource.nome)}>
+                            <div className="flex w-full items-start gap-3">
+                              <Checkbox checked={checked} className="mt-0.5" />
+                              <div className="flex-1">
+                                <div className="flex items-center gap-2">
+                                  <span className="font-medium">{resource.nome}</span>
+                                  {checked ? <Check className="h-4 w-4 text-primary" /> : null}
+                                </div>
+                                <p className="text-xs text-muted-foreground">
+                                  {resource.funcao || "Função não informada"}
+                                  {resource.specialties?.length ? ` · ${resource.specialties.join(", ")}` : ""}
+                                </p>
+                              </div>
+                            </div>
+                          </CommandItem>
+                        );
+                      })}
+                    </CommandGroup>
+                  </CommandList>
+                </Command>
+              </PopoverContent>
+            </Popover>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {selectedResources.map((resource) => (
+                <Badge key={resource.id || resource.nome} variant="secondary" className="gap-1">
+                  {resource.nome}
+                  {resource.specialties?.length ? ` · ${resource.specialties.join(", ")}` : resource.funcao ? ` · ${resource.funcao}` : ""}
+                </Badge>
+              ))}
+              {legacyResourceNames.map((name) => (
+                <Badge key={name} variant="outline" className="gap-1 border-warning text-warning">
+                  {name}
+                  <button type="button" onClick={() => removeLegacyResource(name)} className="ml-1">
+                    <X className="h-3 w-3" />
+                  </button>
+                </Badge>
+              ))}
+            </div>
+            <p className="mt-1 text-xs text-muted-foreground">Use recursos cadastrados para evitar nomes inconsistentes. Recursos legados não mapeados continuam visíveis até serem removidos.</p>
           </div>
           <div>
             <Label>Dependências anteriores</Label>
-            <Input value={predecessorInput} onChange={(e) => setPredecessorInput(e.target.value)} placeholder="Ex: 1.1; 1.2 (SS)" />
-            <p className="mt-1 text-xs text-muted-foreground">Use o ID da tarefa anterior. Opcionalmente informe o tipo entre parênteses, como `SS` ou `FF`.</p>
+            <Input value={predecessorInput} onChange={(e) => setPredecessorInput(e.target.value)} placeholder="Ex: 1.1; 3 (SS)" />
+            <p className="mt-1 text-xs text-muted-foreground">Use o WBS ou o ID visível da tarefa anterior. Opcionalmente informe o tipo entre parênteses, como `SS` ou `FF`.</p>
           </div>
           <div>
             <Label>Início previsto</Label>
