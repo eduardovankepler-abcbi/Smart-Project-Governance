@@ -14,6 +14,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import * as api from "@/services/api";
 import { isApiEnabled } from "@/config/api";
 import ProjetoDialog from "@/components/ProjetoDialog";
+import ProjectTemplateDialog from "@/components/ProjectTemplateDialog";
 import DeleteDialog from "@/components/DeleteDialog";
 import type { Projeto } from "@/data/projectData";
 
@@ -44,6 +45,7 @@ export default function ProjetosPage() {
   const [sortBy, setSortBy] = useState<SortKey>("projeto");
   const [sortAsc, setSortAsc] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [templateDialogOpen, setTemplateDialogOpen] = useState(false);
   const [editProjeto, setEditProjeto] = useState<Projeto | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Projeto | null>(null);
   const [deleting, setDeleting] = useState(false);
@@ -127,6 +129,11 @@ export default function ProjetosPage() {
             <ArrowUpDown size={14} /> Conclusão
           </Button>
           <div className="ml-auto flex gap-2">
+            {canWrite && (
+              <Button variant="outline" size="sm" onClick={() => setTemplateDialogOpen(true)} className="gap-1.5">
+                Templates
+              </Button>
+            )}
             {canWrite && user?.role === "admin" && (
               <Button size="sm" onClick={() => { setEditProjeto(null); setDialogOpen(true); }} className="gap-1.5">
                 <Plus size={14} /> Novo Projeto
@@ -218,6 +225,7 @@ export default function ProjetosPage() {
       </div>
 
       {canWrite && <ProjetoDialog open={dialogOpen} onOpenChange={setDialogOpen} projeto={editProjeto} />}
+      {canWrite && <ProjectTemplateDialog open={templateDialogOpen} onOpenChange={setTemplateDialogOpen} />}
       <DeleteDialog
         open={!!deleteTarget}
         onOpenChange={o => !o && setDeleteTarget(null)}

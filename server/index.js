@@ -277,6 +277,7 @@ app.use("/api/recursos", require("./routes/recursos")(pool, auth));
 app.use("/api/comentarios", require("./routes/comentarios")(pool, auth));
 app.use("/api/auditoria", require("./routes/auditoria")(pool, auth));
 app.use("/api/baselines", require("./routes/baselines")(pool, auth));
+app.use("/api/project-templates", require("./routes/projectTemplates")(pool, auth, taskHooks));
 
 // ============================================
 // Excel Import

@@ -55,6 +55,26 @@ export interface ProjectCurveSResponse {
   };
 }
 
+export interface ProjectTemplate {
+  id: number;
+  templateCode: string;
+  templateName: string;
+  descricao: string;
+  sourceType: "project_snapshot" | "manual" | "xml_import";
+  sourceFormat: "internal_project" | "ms_project_xml" | "mpp";
+  originProjectId?: number;
+  originProjectName: string;
+  isActive: boolean;
+  createdByUserId?: number;
+  createdByName: string;
+  createdByRole: string;
+  totalTasks: number;
+  totalPlannedEffort: number;
+  totalPlannedCost: number;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
 export const AUTH_TOKEN_STORAGE_KEY = "abc_pm_auth_token";
 
 function getStoredToken(): string {
@@ -367,6 +387,43 @@ export async function getProjectCurveS(params: {
   if (params.baselineId) query.set("baselineId", String(params.baselineId));
   if (params.metric) query.set("metric", params.metric);
   return fetchJson<ProjectCurveSResponse>(`/api/baselines/curve-s?${query.toString()}`);
+}
+
+// ===== PROJECT TEMPLATES =====
+export async function getProjectTemplates(): Promise<ProjectTemplate[]> {
+  if (!isApiEnabled()) return [];
+  return fetchJson<ProjectTemplate[]>("/api/project-templates");
+}
+
+export async function createProjectTemplateFromProject(data: {
+  projectId: number;
+  templateName?: string;
+  descricao?: string;
+  sourceType?: ProjectTemplate["sourceType"];
+  sourceFormat?: ProjectTemplate["sourceFormat"];
+}): Promise<ProjectTemplate> {
+  if (!isApiEnabled()) throw new Error("API não configurada");
+  return fetchJson<ProjectTemplate>("/api/project-templates/from-project", {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+}
+
+export async function instantiateProjectTemplate(id: number, data: {
+  projeto: string;
+  projectId?: string;
+  descricao?: string;
+  projectType?: string;
+  prioridade?: string;
+  responsavel?: string;
+  businessUnitId?: number;
+  produtoId?: number;
+}): Promise<{ success: boolean; projectId: number; projectName: string; template: ProjectTemplate }> {
+  if (!isApiEnabled()) throw new Error("API não configurada");
+  return fetchJson(`/api/project-templates/${id}/instantiate`, {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
 }
 
 // ===== RECURSOS =====
