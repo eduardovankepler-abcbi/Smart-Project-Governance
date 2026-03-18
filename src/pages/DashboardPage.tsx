@@ -3,6 +3,7 @@ import Header from "@/components/Header";
 import { useData, formatCurrency } from "@/contexts/DataContext";
 import { Card, CardContent } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend, LineChart, Line } from "recharts";
 import { TrendingUp, AlertTriangle, CheckCircle, Clock, DollarSign, FolderKanban } from "lucide-react";
 import { getTaskResourceNames } from "@/utils/projectModel";
@@ -155,118 +156,129 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-          {kpis.map(({ label, value, icon: Icon, color }) => (
-            <Card key={label} className="border-border/80 bg-card/90 shadow-[0_18px_40px_-32px_rgba(15,23,42,0.45)]">
-              <CardContent className="flex flex-col gap-3 p-4">
-                <div className="flex items-center gap-3">
-                  <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-muted/55">
-                    <Icon size={16} className={color} />
-                  </span>
-                  <span className="text-xs font-medium text-muted-foreground">{label}</span>
-                </div>
-                <p className="text-xl font-display font-bold text-foreground">{value}</p>
+        <Tabs defaultValue="resumo" className="space-y-6">
+          <TabsList className="grid w-full max-w-md grid-cols-2">
+            <TabsTrigger value="resumo">Resumo</TabsTrigger>
+            <TabsTrigger value="curva-s">Curva S</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="resumo" className="space-y-6">
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+              {kpis.map(({ label, value, icon: Icon, color }) => (
+                <Card key={label} className="border-border/80 bg-card/90 shadow-[0_18px_40px_-32px_rgba(15,23,42,0.45)]">
+                  <CardContent className="flex flex-col gap-3 p-4">
+                    <div className="flex items-center gap-3">
+                      <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-muted/55">
+                        <Icon size={16} className={color} />
+                      </span>
+                      <span className="text-xs font-medium text-muted-foreground">{label}</span>
+                    </div>
+                    <p className="text-xl font-display font-bold text-foreground">{value}</p>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              <Card className="border-border/80 bg-card/92 shadow-[0_18px_40px_-32px_rgba(15,23,42,0.42)]">
+                <CardContent className="p-5">
+                  <h3 className="text-sm font-display font-semibold text-foreground mb-4">Status dos Projetos</h3>
+                  <ResponsiveContainer width="100%" height={260}>
+                    <PieChart>
+                      <Pie data={statusData} cx="50%" cy="50%" outerRadius={90} innerRadius={50} dataKey="value" label={({ name, value }) => `${name}: ${value}`}>
+                        {statusData.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
+                      </Pie>
+                      <Tooltip />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </CardContent>
+              </Card>
+
+              <Card className="border-border/80 bg-card/92 shadow-[0_18px_40px_-32px_rgba(15,23,42,0.42)]">
+                <CardContent className="p-5">
+                  <h3 className="text-sm font-display font-semibold text-foreground mb-4">Distribuição de Tarefas por Status</h3>
+                  <ResponsiveContainer width="100%" height={260}>
+                    <PieChart>
+                      <Pie data={tarefaStatusData} cx="50%" cy="50%" outerRadius={90} innerRadius={50} dataKey="value" label={({ name, value }) => `${name}: ${value}`}>
+                        {tarefaStatusData.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
+                      </Pie>
+                      <Tooltip />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </CardContent>
+              </Card>
+
+              <Card className="border-border/80 bg-card/92 shadow-[0_18px_40px_-32px_rgba(15,23,42,0.42)]">
+                <CardContent className="p-5">
+                  <h3 className="text-sm font-display font-semibold text-foreground mb-4">Curva de Burndown</h3>
+                  <ResponsiveContainer width="100%" height={260}>
+                    <LineChart data={burndownData}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                      <XAxis dataKey="name" tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} />
+                      <YAxis tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} />
+                      <Tooltip contentStyle={tooltipStyle} />
+                      <Line type="monotone" dataKey="restantes" name="Restantes" stroke={COLORS[0]} strokeWidth={2} dot={{ r: 4 }} />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </CardContent>
+              </Card>
+            </div>
+
+            <Card className="border-border/80 bg-card/92 shadow-[0_18px_40px_-32px_rgba(15,23,42,0.42)]">
+              <CardContent className="p-5">
+                <h3 className="text-sm font-display font-semibold text-foreground mb-4">Tarefas por Responsável (10 maiores)</h3>
+                <ResponsiveContainer width="100%" height={300}>
+                  <BarChart data={tarefaResponsavelData} layout="vertical" margin={{ left: 20 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                    <XAxis type="number" tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} />
+                    <YAxis type="category" dataKey="name" width={100} tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} />
+                    <Tooltip contentStyle={tooltipStyle} formatter={(v: number, _: string, props: any) => [v, props.payload.fullName]} />
+                    <Bar dataKey="value" name="Tarefas" fill={COLORS[1]} radius={[0, 4, 4, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
               </CardContent>
             </Card>
-          ))}
-        </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <Card className="border-border/80 bg-card/92 shadow-[0_18px_40px_-32px_rgba(15,23,42,0.42)]">
-            <CardContent className="p-5">
-              <h3 className="text-sm font-display font-semibold text-foreground mb-4">Status dos Projetos</h3>
-              <ResponsiveContainer width="100%" height={260}>
-                <PieChart>
-                  <Pie data={statusData} cx="50%" cy="50%" outerRadius={90} innerRadius={50} dataKey="value" label={({ name, value }) => `${name}: ${value}`}>
-                    {statusData.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
-                  </Pie>
-                  <Tooltip />
-                </PieChart>
-              </ResponsiveContainer>
-            </CardContent>
-          </Card>
+            <Card className="border-border/80 bg-card/92 shadow-[0_18px_40px_-32px_rgba(15,23,42,0.42)]">
+              <CardContent className="p-5">
+                <h3 className="text-sm font-display font-semibold text-foreground mb-4">Tarefas por Projeto</h3>
+                <ResponsiveContainer width="100%" height={260}>
+                  <BarChart data={tarefasPorProjeto} layout="vertical" margin={{ left: 20 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                    <XAxis type="number" tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} />
+                    <YAxis type="category" dataKey="name" width={120} tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} />
+                    <Tooltip contentStyle={tooltipStyle} />
+                    <Legend />
+                    <Bar dataKey="atrasadas" name="Atrasadas" fill={COLORS[0]} radius={[0, 4, 4, 0]} />
+                    <Bar dataKey="andamento" name="Em Andamento" fill={COLORS[3]} radius={[0, 4, 4, 0]} />
+                    <Bar dataKey="concluidas" name="Concluídas" fill={COLORS[2]} radius={[0, 4, 4, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
 
-          <Card className="border-border/80 bg-card/92 shadow-[0_18px_40px_-32px_rgba(15,23,42,0.42)]">
-            <CardContent className="p-5">
-              <h3 className="text-sm font-display font-semibold text-foreground mb-4">Distribuição de Tarefas por Status</h3>
-              <ResponsiveContainer width="100%" height={260}>
-                <PieChart>
-                  <Pie data={tarefaStatusData} cx="50%" cy="50%" outerRadius={90} innerRadius={50} dataKey="value" label={({ name, value }) => `${name}: ${value}`}>
-                    {tarefaStatusData.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
-                  </Pie>
-                  <Tooltip />
-                </PieChart>
-              </ResponsiveContainer>
-            </CardContent>
-          </Card>
+            <Card className="border-border/80 bg-card/92 shadow-[0_18px_40px_-32px_rgba(15,23,42,0.42)]">
+              <CardContent className="p-5">
+                <h3 className="text-sm font-display font-semibold text-foreground mb-4">Comparativo Financeiro por Projeto</h3>
+                <ResponsiveContainer width="100%" height={300}>
+                  <BarChart data={filteredProjetos.map(p => ({ name: p.projeto, previsto: p.valorPrevisto, gasto: p.valorGasto }))} margin={{ left: 20 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                    <XAxis dataKey="name" tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} angle={-20} textAnchor="end" height={60} />
+                    <YAxis tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} tickFormatter={(v) => `R$${(v / 1000).toFixed(0)}k`} />
+                    <Tooltip formatter={(v: number) => formatCurrency(v)} contentStyle={tooltipStyle} />
+                    <Legend />
+                    <Bar dataKey="previsto" name="Valor Previsto" fill={COLORS[1]} radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="gasto" name="Valor Gasto" fill={COLORS[0]} radius={[4, 4, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
+          </TabsContent>
 
-          <Card className="border-border/80 bg-card/92 shadow-[0_18px_40px_-32px_rgba(15,23,42,0.42)]">
-            <CardContent className="p-5">
-              <h3 className="text-sm font-display font-semibold text-foreground mb-4">Curva de Burndown</h3>
-              <ResponsiveContainer width="100%" height={260}>
-                <LineChart data={burndownData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                  <XAxis dataKey="name" tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} />
-                  <YAxis tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} />
-                  <Tooltip contentStyle={tooltipStyle} />
-                  <Line type="monotone" dataKey="restantes" name="Restantes" stroke={COLORS[0]} strokeWidth={2} dot={{ r: 4 }} />
-                </LineChart>
-              </ResponsiveContainer>
-            </CardContent>
-          </Card>
-        </div>
-
-        <BaselineGovernancePanel selectedProject={selectedProject} />
-
-        <Card className="border-border/80 bg-card/92 shadow-[0_18px_40px_-32px_rgba(15,23,42,0.42)]">
-          <CardContent className="p-5">
-            <h3 className="text-sm font-display font-semibold text-foreground mb-4">Tarefas por Responsável (10 maiores)</h3>
-            <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={tarefaResponsavelData} layout="vertical" margin={{ left: 20 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                <XAxis type="number" tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} />
-                <YAxis type="category" dataKey="name" width={100} tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} />
-                <Tooltip contentStyle={tooltipStyle} formatter={(v: number, _: string, props: any) => [v, props.payload.fullName]} />
-                <Bar dataKey="value" name="Tarefas" fill={COLORS[1]} radius={[0, 4, 4, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-
-        <Card className="border-border/80 bg-card/92 shadow-[0_18px_40px_-32px_rgba(15,23,42,0.42)]">
-          <CardContent className="p-5">
-            <h3 className="text-sm font-display font-semibold text-foreground mb-4">Tarefas por Projeto</h3>
-            <ResponsiveContainer width="100%" height={260}>
-              <BarChart data={tarefasPorProjeto} layout="vertical" margin={{ left: 20 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                <XAxis type="number" tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} />
-                <YAxis type="category" dataKey="name" width={120} tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} />
-                <Tooltip contentStyle={tooltipStyle} />
-                <Legend />
-                <Bar dataKey="atrasadas" name="Atrasadas" fill={COLORS[0]} radius={[0, 4, 4, 0]} />
-                <Bar dataKey="andamento" name="Em Andamento" fill={COLORS[3]} radius={[0, 4, 4, 0]} />
-                <Bar dataKey="concluidas" name="Concluídas" fill={COLORS[2]} radius={[0, 4, 4, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-
-        <Card className="border-border/80 bg-card/92 shadow-[0_18px_40px_-32px_rgba(15,23,42,0.42)]">
-          <CardContent className="p-5">
-            <h3 className="text-sm font-display font-semibold text-foreground mb-4">Comparativo Financeiro por Projeto</h3>
-            <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={filteredProjetos.map(p => ({ name: p.projeto, previsto: p.valorPrevisto, gasto: p.valorGasto }))} margin={{ left: 20 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                <XAxis dataKey="name" tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} angle={-20} textAnchor="end" height={60} />
-                <YAxis tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} tickFormatter={(v) => `R$${(v / 1000).toFixed(0)}k`} />
-                <Tooltip formatter={(v: number) => formatCurrency(v)} contentStyle={tooltipStyle} />
-                <Legend />
-                <Bar dataKey="previsto" name="Valor Previsto" fill={COLORS[1]} radius={[4, 4, 0, 0]} />
-                <Bar dataKey="gasto" name="Valor Gasto" fill={COLORS[0]} radius={[4, 4, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
+          <TabsContent value="curva-s" className="space-y-6">
+            <BaselineGovernancePanel selectedProject={selectedProject} />
+          </TabsContent>
+        </Tabs>
       </div>
     </div>
   );
