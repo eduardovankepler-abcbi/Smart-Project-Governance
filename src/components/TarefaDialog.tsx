@@ -136,6 +136,13 @@ export default function TarefaDialog({ open, onOpenChange, tarefa, defaultParent
     return tarefas.filter((item) => item.projeto === form.projeto && getTaskHierarchyDepth(item) < MAX_TASK_WBS_DEPTH && item.id !== form.id);
   }, [tarefas, form.projeto, form.id]);
 
+  const blockedParents = useMemo(() => {
+    if (!form.projeto) return [];
+    return tarefas
+      .filter((item) => item.projeto === form.projeto && getTaskHierarchyDepth(item) >= MAX_TASK_WBS_DEPTH && item.id !== form.id)
+      .sort((a, b) => getTaskDisplayHierarchy(a).localeCompare(getTaskDisplayHierarchy(b), undefined, { numeric: true }));
+  }, [tarefas, form.projeto, form.id]);
+
   const groupedAvailableParents = useMemo(() => {
     const groups = new Map<string, Tarefa[]>();
     availableParents
@@ -178,6 +185,13 @@ export default function TarefaDialog({ open, onOpenChange, tarefa, defaultParent
   const depthLabel = mode === "subtask"
     ? `Subtarefa ${currentDepth === 0 ? "" : `Nível ${currentDepth + 1}`}`.trim()
     : "Tarefa";
+  const hierarchyPreview = mode === "subtask" && form.projeto
+    ? {
+        nextBusinessId: getTaskBusinessId(form) || "—",
+        nextWbs: form.wbs || "—",
+        nextLevel: form.outlineLevel || (currentDepth + 1),
+      }
+    : null;
 
   const buildAssignments = () => {
     const names = [...selectedResourceNames, ...legacyResourceNames];
@@ -349,6 +363,26 @@ export default function TarefaDialog({ open, onOpenChange, tarefa, defaultParent
                           ))}
                         </CommandGroup>
                       ))}
+                      {blockedParents.length ? (
+                        <CommandGroup heading="Bloqueadas neste nível">
+                          {blockedParents.map((item) => (
+                            <CommandItem key={`blocked-${item.id}`} value={`blocked ${item.tarefa} ${item.id}`} disabled>
+                              <div className="flex w-full items-start gap-3 opacity-50">
+                                <div className="flex-1">
+                                  <div className="flex items-center gap-2">
+                                    <span className="font-medium">{item.tarefa}</span>
+                                    <Badge variant="outline" className="font-mono">WBS {getTaskDisplayHierarchy(item)}</Badge>
+                                    <Badge variant="destructive">Nível máximo</Badge>
+                                  </div>
+                                  <p className="mt-1 text-xs text-muted-foreground">
+                                    Este item já está no nível {getTaskHierarchyDepth(item)} e não pode receber nova subtarefa.
+                                  </p>
+                                </div>
+                              </div>
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      ) : null}
                     </CommandList>
                   </Command>
                 </PopoverContent>
@@ -356,6 +390,20 @@ export default function TarefaDialog({ open, onOpenChange, tarefa, defaultParent
               <p className="mt-1 text-xs text-muted-foreground">
                 Apenas tarefas do mesmo projeto e com menos de {MAX_TASK_WBS_DEPTH} níveis aparecem aqui. Isso evita subtarefas em níveis inválidos ou associações ambíguas.
               </p>
+              {hierarchyPreview ? (
+                <div className="mt-3 rounded-lg border border-border bg-muted/20 p-3 text-xs text-muted-foreground">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Badge variant="outline" className="font-mono">Novo ID {hierarchyPreview.nextBusinessId}</Badge>
+                    <Badge variant="outline" className="font-mono">Novo WBS {hierarchyPreview.nextWbs}</Badge>
+                    <Badge variant="secondary">Nível {hierarchyPreview.nextLevel}</Badge>
+                  </div>
+                  <p className="mt-2">
+                    {selectedParentTask
+                      ? `A nova subtarefa será criada abaixo de "${selectedParentTask.tarefa}" no projeto ${form.projeto}.`
+                      : "Selecione uma tarefa pai para visualizar a posição hierárquica da nova subtarefa."}
+                  </p>
+                </div>
+              ) : null}
             </div>
           ) : (
             <div>
