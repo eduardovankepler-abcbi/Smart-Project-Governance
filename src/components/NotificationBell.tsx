@@ -1,9 +1,11 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Bell } from "lucide-react";
-import { tarefas } from "@/data/projectData";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { useData } from "@/contexts/DataContext";
+
+const NOTIFICATION_READ_STORAGE_KEY = "abc_pm_read_notifications_v1";
 
 function parseDate(dateStr: string): Date | null {
   if (!dateStr) return null;
@@ -26,7 +28,17 @@ interface Notification {
 }
 
 export default function NotificationBell() {
+  const { tarefas } = useData();
   const [open, setOpen] = useState(false);
+  const [readNotificationIds, setReadNotificationIds] = useState<string[]>(() => {
+    if (typeof window === "undefined") return [];
+    try {
+      const raw = window.localStorage.getItem(NOTIFICATION_READ_STORAGE_KEY);
+      return raw ? JSON.parse(raw) : [];
+    } catch {
+      return [];
+    }
+  });
 
   const notifications = useMemo<Notification[]>(() => {
     const now = new Date();
@@ -59,18 +71,37 @@ export default function NotificationBell() {
     });
 
     return alerts.slice(0, 50);
-  }, []);
+  }, [tarefas]);
 
-  const count = notifications.length;
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem(NOTIFICATION_READ_STORAGE_KEY, JSON.stringify(readNotificationIds));
+  }, [readNotificationIds]);
+
+  useEffect(() => {
+    const activeIds = new Set(notifications.map((notification) => notification.id));
+    setReadNotificationIds((current) => current.filter((id) => activeIds.has(id)));
+  }, [notifications]);
+
+  useEffect(() => {
+    if (!open || notifications.length === 0) return;
+    setReadNotificationIds((current) => {
+      const merged = new Set(current);
+      notifications.forEach((notification) => merged.add(notification.id));
+      return Array.from(merged);
+    });
+  }, [open, notifications]);
+
+  const unreadCount = notifications.filter((notification) => !readNotificationIds.includes(notification.id)).length;
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <Button variant="outline" size="icon" className="rounded-full relative">
           <Bell size={18} />
-          {count > 0 && (
+          {unreadCount > 0 && (
             <span className="absolute -top-1 -right-1 h-5 min-w-[20px] px-1 flex items-center justify-center rounded-full bg-destructive text-destructive-foreground text-[10px] font-bold">
-              {count > 99 ? "99+" : count}
+              {unreadCount > 99 ? "99+" : unreadCount}
             </span>
           )}
         </Button>
@@ -78,7 +109,9 @@ export default function NotificationBell() {
       <PopoverContent className="w-80 p-0" align="end">
         <div className="px-4 py-3 border-b border-border">
           <h4 className="text-sm font-display font-semibold text-foreground">Notificações</h4>
-          <p className="text-xs text-muted-foreground">{count} alerta(s)</p>
+          <p className="text-xs text-muted-foreground">
+            {notifications.length} alerta(s) · {unreadCount} não lido(s)
+          </p>
         </div>
         <ScrollArea className="max-h-80">
           {notifications.length === 0 ? (
@@ -86,7 +119,7 @@ export default function NotificationBell() {
           ) : (
             <div className="divide-y divide-border">
               {notifications.map(n => (
-                <div key={n.id} className="px-4 py-3 hover:bg-muted/50 transition-colors">
+                <div key={n.id} className={`px-4 py-3 hover:bg-muted/50 transition-colors ${readNotificationIds.includes(n.id) ? "opacity-70" : ""}`}>
                   <div className="flex items-start gap-2">
                     <span className={`mt-0.5 h-2 w-2 rounded-full shrink-0 ${n.type === "atrasada" ? "bg-destructive" : "bg-warning"}`} />
                     <div className="min-w-0">
