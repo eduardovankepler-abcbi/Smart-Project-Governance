@@ -6,6 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend, LineChart, Line } from "recharts";
 import { TrendingUp, AlertTriangle, CheckCircle, Clock, DollarSign, FolderKanban } from "lucide-react";
 import { getTaskResourceNames } from "@/utils/projectModel";
+import BaselineGovernancePanel from "@/components/BaselineGovernancePanel";
 
 const COLORS = [
   "hsl(0, 78%, 45%)",
@@ -41,6 +42,11 @@ export default function DashboardPage() {
     if (filterProjeto === "all") return tarefas;
     return tarefas.filter(t => t.projeto === filterProjeto);
   }, [filterProjeto, tarefas]);
+
+  const selectedProject = useMemo(
+    () => projetos.find((project) => project.projeto === filterProjeto) || null,
+    [filterProjeto, projetos]
+  );
 
   const statusData = useMemo(() => {
     const counts: Record<string, number> = {};
@@ -209,6 +215,8 @@ export default function DashboardPage() {
             </CardContent>
           </Card>
         </div>
+
+        <BaselineGovernancePanel selectedProject={selectedProject} />
 
         <Card className="border-border/80 bg-card/92 shadow-[0_18px_40px_-32px_rgba(15,23,42,0.42)]">
           <CardContent className="p-5">

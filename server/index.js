@@ -25,6 +25,7 @@ const { syncFullSnapshot, checkSupabaseHealth, isSupabaseSyncEnabled } = require
 const { syncProjectMetrics } = require("./utils/projectMetrics");
 const { parseMsProjectXml } = require("./utils/msProjectXml");
 const { logAudit } = require("./utils/audit");
+const { BASELINE_SOURCE_TYPES, createProjectBaseline } = require("./utils/baselines");
 const {
   ROLES,
   canWriteData,
@@ -275,6 +276,7 @@ app.use("/api/alocacoes", require("./routes/alocacoes")(pool, auth));
 app.use("/api/recursos", require("./routes/recursos")(pool, auth));
 app.use("/api/comentarios", require("./routes/comentarios")(pool, auth));
 app.use("/api/auditoria", require("./routes/auditoria")(pool, auth));
+app.use("/api/baselines", require("./routes/baselines")(pool, auth));
 
 // ============================================
 // Excel Import
@@ -658,6 +660,17 @@ app.post("/api/import-ms-project", requireAuth, requireImportAccess, uploadMsPro
 
       await conn.commit();
       await syncProjectMetrics(pool, parsed.projectName);
+      try {
+        if (projectId) {
+          await createProjectBaseline(pool, {
+            projectId,
+            sourceType: BASELINE_SOURCE_TYPES.XML_IMPORT,
+            actor: req.authUser,
+          });
+        }
+      } catch (baselineError) {
+        console.error("Baseline bootstrap after XML import failed:", baselineError);
+      }
       if (isSupabaseSyncEnabled()) await syncFullSnapshot(pool);
       const [auditProjectRows] = await pool.query("SELECT id FROM projetos WHERE projeto = ? LIMIT 1", [parsed.projectName]);
       await logAudit(pool, {

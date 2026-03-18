@@ -2,6 +2,7 @@ const express = require("express");
 const router = express.Router();
 const { sanitizeString, sanitizeNumber, sanitizeInt, normalizeDateInput } = require("../utils/parsing");
 const { logAudit } = require("../utils/audit");
+const { BASELINE_SOURCE_TYPES, createProjectBaseline } = require("../utils/baselines");
 
 module.exports = function (pool, auth) {
   const { requireAuth, requireWriteAccess, getAccessibleProjectIdsFilter } = auth;
@@ -99,6 +100,15 @@ module.exports = function (pool, auth) {
       );
       const [rows] = await pool.query("SELECT * FROM projetos WHERE id = ?", [result.insertId]);
       await supabaseSync.syncProjeto(rows[0]);
+      try {
+        await createProjectBaseline(pool, {
+          projectId: result.insertId,
+          sourceType: BASELINE_SOURCE_TYPES.PROJECT_CREATE,
+          actor: req.authUser,
+        });
+      } catch (baselineError) {
+        console.error("Baseline bootstrap after project creation failed:", baselineError);
+      }
       await logAudit(pool, {
         actor: req.authUser,
         action: "create",

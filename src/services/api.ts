@@ -9,6 +9,52 @@ import {
   recursos as localRecursos,
 } from "@/data/projectData";
 
+export interface ProjectBaseline {
+  id: number;
+  projectId: number;
+  projectName: string;
+  projectCode: string;
+  baselineNumber: number;
+  baselineName: string;
+  sourceType: "project_create" | "xml_import" | "manual" | "replan";
+  status: "pending_approval" | "approved" | "rejected";
+  isOfficial: boolean;
+  justification: string;
+  approvalNotes: string;
+  requestedByUserId?: number;
+  requestedByName: string;
+  requestedByRole: string;
+  approvedByUserId?: number;
+  approvedByName: string;
+  approvedAt?: string;
+  taskCount: number;
+  totalPlannedEffort: number;
+  totalPlannedCost: number;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface CurvePoint {
+  weekStart: string;
+  weekEnd: string;
+  label: string;
+  planned: number;
+  actual: number;
+  variance: number;
+}
+
+export interface ProjectCurveSResponse {
+  aggregation: "weekly";
+  metric: "effort" | "cost" | "progress";
+  baseline: ProjectBaseline | null;
+  points: CurvePoint[];
+  summary: {
+    plannedTotal: number;
+    actualTotal: number;
+    varianceTotal: number;
+  };
+}
+
 export const AUTH_TOKEN_STORAGE_KEY = "abc_pm_auth_token";
 
 function getStoredToken(): string {
@@ -266,6 +312,61 @@ export async function getAuditoria(params?: { projectId?: number; entityType?: s
   if (params?.entityType) query.set("entityType", params.entityType);
   if (params?.search) query.set("search", params.search);
   return fetchJson<AuditLog[]>(`/api/auditoria${query.toString() ? `?${query.toString()}` : ""}`);
+}
+
+// ===== BASELINES =====
+export async function getProjectBaselines(projectId?: number): Promise<ProjectBaseline[]> {
+  if (!isApiEnabled()) return [];
+  const query = new URLSearchParams();
+  if (projectId) query.set("projectId", String(projectId));
+  return fetchJson<ProjectBaseline[]>(`/api/baselines${query.toString() ? `?${query.toString()}` : ""}`);
+}
+
+export async function createProjectBaseline(data: {
+  projectId: number;
+  baselineName?: string;
+  sourceType?: ProjectBaseline["sourceType"];
+  justification?: string;
+}): Promise<ProjectBaseline> {
+  if (!isApiEnabled()) throw new Error("API não configurada");
+  return fetchJson<ProjectBaseline>("/api/baselines", { method: "POST", body: JSON.stringify(data) });
+}
+
+export async function approveProjectBaseline(id: number, approvalNotes?: string): Promise<ProjectBaseline> {
+  if (!isApiEnabled()) throw new Error("API não configurada");
+  return fetchJson<ProjectBaseline>(`/api/baselines/${id}/approve`, {
+    method: "POST",
+    body: JSON.stringify({ approvalNotes }),
+  });
+}
+
+export async function rejectProjectBaseline(id: number, approvalNotes?: string): Promise<ProjectBaseline> {
+  if (!isApiEnabled()) throw new Error("API não configurada");
+  return fetchJson<ProjectBaseline>(`/api/baselines/${id}/reject`, {
+    method: "POST",
+    body: JSON.stringify({ approvalNotes }),
+  });
+}
+
+export async function getProjectCurveS(params: {
+  projectId: number;
+  baselineId?: number;
+  metric?: ProjectCurveSResponse["metric"];
+}): Promise<ProjectCurveSResponse> {
+  if (!isApiEnabled()) {
+    return {
+      aggregation: "weekly",
+      metric: params.metric || "effort",
+      baseline: null,
+      points: [],
+      summary: { plannedTotal: 0, actualTotal: 0, varianceTotal: 0 },
+    };
+  }
+  const query = new URLSearchParams();
+  query.set("projectId", String(params.projectId));
+  if (params.baselineId) query.set("baselineId", String(params.baselineId));
+  if (params.metric) query.set("metric", params.metric);
+  return fetchJson<ProjectCurveSResponse>(`/api/baselines/curve-s?${query.toString()}`);
 }
 
 // ===== RECURSOS =====
