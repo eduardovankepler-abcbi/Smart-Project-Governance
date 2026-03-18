@@ -109,46 +109,57 @@ export default function ProjetosPage() {
     <div className="flex flex-col">
       <Header title="Projetos" />
       <div className="p-6 animate-fade-in space-y-4">
-        {/* Toolbar */}
-        <div className="flex flex-wrap gap-3 items-end">
-          <Input placeholder="Buscar projeto..." value={search} onChange={e => setSearch(e.target.value)} className="w-64" />
-          <Select value={filterStatus} onValueChange={setFilterStatus}>
-            <SelectTrigger className="w-44"><SelectValue placeholder="Status" /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todos os Status</SelectItem>
-              {STATUS_OPTIONS.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
-            </SelectContent>
-          </Select>
-          <Button variant="outline" size="sm" onClick={() => toggleSort("projeto")} className="gap-1.5">
-            <ArrowUpDown size={14} /> Nome
-          </Button>
-          <Button variant="outline" size="sm" onClick={() => toggleSort("dataFimPlanej")} className="gap-1.5">
-            <ArrowUpDown size={14} /> Prazo
-          </Button>
-          <Button variant="outline" size="sm" onClick={() => toggleSort("conclusao")} className="gap-1.5">
-            <ArrowUpDown size={14} /> Conclusão
-          </Button>
-          <div className="ml-auto flex gap-2">
-            {canWrite && (
-              <Button variant="outline" size="sm" onClick={() => setTemplateDialogOpen(true)} className="gap-1.5">
-                Templates
+        <div className="rounded-2xl border border-border/70 bg-card/70 shadow-sm">
+          <div className="grid gap-4 p-4 xl:grid-cols-[minmax(0,1fr)_auto] xl:items-start">
+            <div className="flex flex-wrap gap-3">
+              <Input
+                placeholder="Buscar projeto..."
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                className="min-w-[240px] flex-1 xl:max-w-[320px]"
+              />
+              <Select value={filterStatus} onValueChange={setFilterStatus}>
+                <SelectTrigger className="w-full sm:w-44"><SelectValue placeholder="Status" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos os Status</SelectItem>
+                  {STATUS_OPTIONS.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                </SelectContent>
+              </Select>
+              <Button variant="outline" size="sm" onClick={() => toggleSort("projeto")} className="min-w-[110px] gap-1.5 justify-center">
+                <ArrowUpDown size={14} /> Nome
               </Button>
-            )}
-            {canWrite && user?.role === "admin" && (
-              <Button size="sm" onClick={() => { setEditProjeto(null); setDialogOpen(true); }} className="gap-1.5">
-                <Plus size={14} /> Novo Projeto
+              <Button variant="outline" size="sm" onClick={() => toggleSort("dataFimPlanej")} className="min-w-[110px] gap-1.5 justify-center">
+                <ArrowUpDown size={14} /> Prazo
               </Button>
-            )}
-            <Button variant="outline" size="sm" onClick={handleExportPdf} className="gap-1.5">
-              <FileDown size={14} /> PDF
-            </Button>
-            <Button variant="outline" size="sm" onClick={handleExportExcel} className="gap-1.5">
-              <FileSpreadsheet size={14} /> Excel
-            </Button>
+              <Button variant="outline" size="sm" onClick={() => toggleSort("conclusao")} className="min-w-[126px] gap-1.5 justify-center">
+                <ArrowUpDown size={14} /> Conclusão
+              </Button>
+            </div>
+
+            <div className="flex flex-wrap gap-2 xl:justify-end">
+              {canWrite && (
+                <Button variant="outline" size="sm" onClick={() => setTemplateDialogOpen(true)} className="min-w-[124px] gap-1.5 justify-center">
+                  Templates
+                </Button>
+              )}
+              {canWrite && user?.role === "admin" && (
+                <Button size="sm" onClick={() => { setEditProjeto(null); setDialogOpen(true); }} className="min-w-[168px] gap-1.5 justify-center">
+                  <Plus size={14} /> Novo Projeto
+                </Button>
+              )}
+              <Button variant="outline" size="sm" onClick={handleExportPdf} className="min-w-[92px] gap-1.5 justify-center">
+                <FileDown size={14} /> PDF
+              </Button>
+              <Button variant="outline" size="sm" onClick={handleExportExcel} className="min-w-[96px] gap-1.5 justify-center">
+                <FileSpreadsheet size={14} /> Excel
+              </Button>
+            </div>
+          </div>
+
+          <div className="border-t border-border/60 px-4 py-3 text-xs text-muted-foreground">
+            {filtered.length} projeto(s) encontrado(s)
           </div>
         </div>
-
-        <div className="text-xs text-muted-foreground">{filtered.length} projeto(s) encontrado(s)</div>
 
         <div className="grid gap-4">
           {filtered.map(p => (
