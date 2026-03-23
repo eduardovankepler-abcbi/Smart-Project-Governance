@@ -203,10 +203,14 @@ export default function BaselineGovernancePanel({ selectedProject }: BaselineGov
           </div>
 
           <div className="grid gap-3 md:grid-cols-2">
-            <div className="rounded-xl border border-border/70 bg-background/60 p-4">
+            <div className="min-w-0 rounded-xl border border-border/70 bg-background/60 p-4">
               <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Projeto</p>
-              <p className="mt-2 text-sm font-medium text-foreground">{selectedProject.projeto}</p>
-              <p className="mt-1 text-xs text-muted-foreground">{selectedProject.projectId || "Sem código"}</p>
+              <p className="mt-2 text-sm font-medium leading-6 text-foreground break-words [overflow-wrap:anywhere]">
+                {selectedProject.projeto}
+              </p>
+              <p className="mt-1 text-xs font-mono leading-5 text-muted-foreground break-all">
+                {selectedProject.projectId || "Sem código"}
+              </p>
             </div>
             <div className="rounded-xl border border-border/70 bg-background/60 p-4">
               <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Baselines</p>
