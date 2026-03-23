@@ -12,9 +12,15 @@ dist
 dist-ssr
 *.local
 .env
-.env.vps
-.env.vercel
+.env.*
+!.env.example
+!.env.*.example
 server/.env
+server/.env*
+!server/.env.example
+!server/.env.*.example
+uploads/
+server/uploads/
 
 # Editor directories and files
 .vscode/*

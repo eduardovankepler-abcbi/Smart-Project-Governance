@@ -41,6 +41,97 @@ const PORT = process.env.PORT || 3001;
 app.disable("x-powered-by");
 app.set("trust proxy", 1);
 
+const UPLOAD_DIR = path.resolve(__dirname, "uploads");
+const OLE_XLS_SIGNATURE = Buffer.from([0xD0, 0xCF, 0x11, 0xE0, 0xA1, 0xB1, 0x1A, 0xE1]);
+const ZIP_SIGNATURE = Buffer.from([0x50, 0x4B, 0x03, 0x04]);
+
+function ensureDirectory(dirPath) {
+  if (!fs.existsSync(dirPath)) fs.mkdirSync(dirPath, { recursive: true });
+}
+
+function createHttpError(message, code, status) {
+  const error = new Error(message);
+  error.code = code;
+  error.status = status;
+  return error;
+}
+
+function readFilePrefix(filePath, length = 2048) {
+  const fd = fs.openSync(filePath, "r");
+  try {
+    const buffer = Buffer.alloc(length);
+    const bytesRead = fs.readSync(fd, buffer, 0, length, 0);
+    return buffer.subarray(0, bytesRead);
+  } finally {
+    fs.closeSync(fd);
+  }
+}
+
+function bufferStartsWith(buffer, signature) {
+  return buffer.length >= signature.length && buffer.subarray(0, signature.length).equals(signature);
+}
+
+function assertAllowedMimeType(file, allowedMimeTypes, label) {
+  const mimeType = String(file?.mimetype || "").toLowerCase();
+  if (!mimeType || mimeType === "application/octet-stream") return;
+  if (allowedMimeTypes.has(mimeType)) return;
+  throw createHttpError(`Tipo MIME inválido para ${label}`, "FILE_TYPE_INVALID", 415);
+}
+
+function assertExcelFileIntegrity(file) {
+  const ext = path.extname(file.originalname).toLowerCase();
+  const allowedMimeTypes = new Set([
+    "application/vnd.ms-excel",
+    "application/vnd.ms-excel.sheet.macroenabled.12",
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    "application/zip",
+  ]);
+  assertAllowedMimeType(file, allowedMimeTypes, "planilha");
+
+  const prefix = readFilePrefix(file.path, 16);
+  if ([".xlsx", ".xlsm"].includes(ext) && !bufferStartsWith(prefix, ZIP_SIGNATURE)) {
+    throw createHttpError("Conteúdo do arquivo não corresponde a uma planilha Excel válida", "FILE_CONTENT_INVALID", 415);
+  }
+  if (ext === ".xls" && !bufferStartsWith(prefix, OLE_XLS_SIGNATURE)) {
+    throw createHttpError("Conteúdo do arquivo não corresponde a um arquivo .xls válido", "FILE_CONTENT_INVALID", 415);
+  }
+}
+
+function assertXmlFileIntegrity(file) {
+  const allowedMimeTypes = new Set([
+    "application/xml",
+    "text/xml",
+    "application/msproject",
+  ]);
+  assertAllowedMimeType(file, allowedMimeTypes, "XML");
+
+  const prefix = readFilePrefix(file.path, 2048).toString("utf8").replace(/^\uFEFF/, "").trimStart();
+  if (!prefix.startsWith("<?xml") && !prefix.startsWith("<Project")) {
+    throw createHttpError("Conteúdo do arquivo não corresponde a um XML válido", "FILE_CONTENT_INVALID", 415);
+  }
+  if (/<!DOCTYPE/i.test(prefix)) {
+    throw createHttpError("Arquivos XML com DOCTYPE não são permitidos", "FILE_XML_UNSAFE", 415);
+  }
+}
+
+function getUploadedFileMetadata(file) {
+  if (!file) return null;
+  return {
+    originalName: sanitizeString(file.originalname, 255),
+    mimeType: sanitizeString(file.mimetype, 120),
+    size: Number(file.size || 0),
+  };
+}
+
+async function logImportEvent(actor, payload) {
+  await logAudit(pool, {
+    actor,
+    ...payload,
+  });
+}
+
+ensureDirectory(UPLOAD_DIR);
+
 function buildProjectCode(projectId, projeto) {
   const explicit = sanitizeString(projectId, 50).toUpperCase();
   if (explicit) return explicit;
@@ -287,7 +378,7 @@ const MAX_FILE_SIZE = MAX_FILE_SIZE_MB * 1024 * 1024;
 const MAX_ROWS = 5000;
 
 const upload = multer({
-  dest: "uploads/",
+  dest: UPLOAD_DIR,
   limits: { fileSize: MAX_FILE_SIZE },
   fileFilter(_req, file, cb) {
     const ext = path.extname(file.originalname).toLowerCase();
@@ -299,7 +390,7 @@ const upload = multer({
 });
 
 const uploadMsProject = multer({
-  dest: "uploads/",
+  dest: UPLOAD_DIR,
   limits: { fileSize: MAX_FILE_SIZE },
   fileFilter(_req, file, cb) {
     const ext = path.extname(file.originalname).toLowerCase();
@@ -314,13 +405,15 @@ app.post("/api/import-excel", requireAuth, requireImportAccess, upload.single("f
   if (!req.file) return res.status(400).json({ error: "Nenhum arquivo enviado", code: "NO_FILE" });
 
   const filePath = req.file.path;
+  const fileMetadata = getUploadedFileMetadata(req.file);
+  let imported = { projetos: 0, tarefas: 0, recursos: 0 };
 
   try {
+    assertExcelFileIntegrity(req.file);
     const workbook = new ExcelJS.Workbook();
     await workbook.xlsx.readFile(filePath);
 
     const conn = await pool.getConnection();
-    const imported = { projetos: 0, tarefas: 0, recursos: 0 };
 
     try {
       await conn.beginTransaction();
@@ -451,13 +544,12 @@ app.post("/api/import-excel", requireAuth, requireImportAccess, upload.single("f
       if (isSupabaseSyncEnabled()) {
         await syncFullSnapshot(pool);
       }
-      await logAudit(pool, {
-        actor: req.authUser,
+      await logImportEvent(req.authUser, {
         action: "import",
         entityType: "excel_import",
         entityId: req.file.originalname,
         summary: `Importação Excel executada (${imported.projetos} projetos, ${imported.tarefas} tarefas, ${imported.recursos} recursos)`,
-        after: imported,
+        after: { imported, file: fileMetadata },
       });
       res.json({ success: true, imported });
     } catch (err) {
@@ -468,7 +560,17 @@ app.post("/api/import-excel", requireAuth, requireImportAccess, upload.single("f
     }
   } catch (err) {
     console.error("Import error:", err);
-    res.status(500).json({ error: "Erro ao importar planilha", code: "IMPORT_ERROR" });
+    await logImportEvent(req.authUser, {
+      action: "import_failed",
+      entityType: "excel_import",
+      entityId: req.file.originalname,
+      summary: `Falha na importação Excel: ${sanitizeString(err.message, 300)}`,
+      after: { imported, file: fileMetadata, errorCode: err.code || "IMPORT_ERROR" },
+    });
+    res.status(err.status || 500).json({
+      error: err.status ? err.message : "Erro ao importar planilha",
+      code: err.code || "IMPORT_ERROR",
+    });
   } finally {
     try { fs.unlinkSync(filePath); } catch (_) {}
   }
@@ -478,8 +580,13 @@ app.post("/api/import-ms-project", requireAuth, requireImportAccess, uploadMsPro
   if (!req.file) return res.status(400).json({ error: "Nenhum arquivo XML enviado", code: "NO_FILE" });
 
   const filePath = req.file.path;
+  const fileMetadata = getUploadedFileMetadata(req.file);
   try {
+    assertXmlFileIntegrity(req.file);
     const xmlContent = fs.readFileSync(filePath, "utf8");
+    if (/<!DOCTYPE/i.test(xmlContent)) {
+      throw createHttpError("Arquivos XML com DOCTYPE não são permitidos", "FILE_XML_UNSAFE", 415);
+    }
     const parsed = parseMsProjectXml(xmlContent);
     const conn = await pool.getConnection();
 
@@ -674,14 +781,17 @@ app.post("/api/import-ms-project", requireAuth, requireImportAccess, uploadMsPro
       }
       if (isSupabaseSyncEnabled()) await syncFullSnapshot(pool);
       const [auditProjectRows] = await pool.query("SELECT id FROM projetos WHERE projeto = ? LIMIT 1", [parsed.projectName]);
-      await logAudit(pool, {
-        actor: req.authUser,
+      await logImportEvent(req.authUser, {
         action: "import",
         entityType: "ms_project_import",
         entityId: parsed.projectName,
         projectId: auditProjectRows[0]?.id || null,
         summary: `Importação MS Project XML executada para ${parsed.projectName}`,
-        after: { tarefas: parsed.tasks.length, recursos: parsed.resources.length },
+        after: {
+          tarefas: parsed.tasks.length,
+          recursos: parsed.resources.length,
+          file: fileMetadata,
+        },
       });
       res.json({
         success: true,
@@ -700,7 +810,17 @@ app.post("/api/import-ms-project", requireAuth, requireImportAccess, uploadMsPro
     }
   } catch (err) {
     console.error("MS Project import error:", err);
-    res.status(500).json({ error: "Erro ao importar XML do MS Project", code: "IMPORT_MS_PROJECT" });
+    await logImportEvent(req.authUser, {
+      action: "import_failed",
+      entityType: "ms_project_import",
+      entityId: req.file.originalname,
+      summary: `Falha na importação MS Project XML: ${sanitizeString(err.message, 300)}`,
+      after: { file: fileMetadata, errorCode: err.code || "IMPORT_MS_PROJECT" },
+    });
+    res.status(err.status || 500).json({
+      error: err.status ? err.message : "Erro ao importar XML do MS Project",
+      code: err.code || "IMPORT_MS_PROJECT",
+    });
   } finally {
     try { fs.unlinkSync(filePath); } catch (_) {}
   }
@@ -727,6 +847,9 @@ app.use((err, _req, res, _next) => {
       error: `Arquivo excede o limite de ${MAX_FILE_SIZE_MB} MB`,
       code: "FILE_TOO_LARGE",
     });
+  }
+  if (err.status && err.code) {
+    return res.status(err.status).json({ error: err.message, code: err.code });
   }
   res.status(500).json({ error: "Internal server error", code: "INTERNAL" });
 });
