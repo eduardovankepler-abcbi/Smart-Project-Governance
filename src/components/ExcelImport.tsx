@@ -1,40 +1,45 @@
 import { useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Upload, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useData } from "@/contexts/DataContext";
+import { useAuth } from "@/contexts/AuthContext";
 import { parseExcelFile } from "@/utils/importUtils";
 import { isApiEnabled } from "@/config/api";
 import * as api from "@/services/api";
 
 const MAX_IMPORT_SIZE_MB = 25;
 const MAX_IMPORT_SIZE_BYTES = MAX_IMPORT_SIZE_MB * 1024 * 1024;
+const IMPORT_CONFIRMATION_PHRASES = {
+  excel: "SUBSTITUIR TUDO",
+  xml: "SUBSTITUIR CRONOGRAMA",
+} as const;
+
+type PendingImportKind = "excel" | "xml";
 
 export default function ExcelImport() {
   const inputRef = useRef<HTMLInputElement>(null);
   const [loading, setLoading] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [confirmationText, setConfirmationText] = useState("");
+  const [pendingFile, setPendingFile] = useState<File | null>(null);
+  const [pendingImportKind, setPendingImportKind] = useState<PendingImportKind | null>(null);
   const { toast } = useToast();
+  const { user } = useAuth();
   const { setProjetos, setTarefas, setRecursos, refreshAll } = useData();
 
-  const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  const resetSelection = () => {
+    setPendingFile(null);
+    setPendingImportKind(null);
+    setConfirmationText("");
+    setConfirmOpen(false);
+    if (inputRef.current) inputRef.current.value = "";
+  };
 
-    const ext = file.name.split(".").pop()?.toLowerCase();
-    if (!["xlsx", "xlsm", "xml"].includes(ext || "")) {
-      toast({ title: "Formato inválido", description: "Selecione um arquivo .xlsx, .xlsm ou .xml", variant: "destructive" });
-      return;
-    }
-
-    if (file.size > MAX_IMPORT_SIZE_BYTES) {
-      toast({
-        title: "Arquivo muito grande",
-        description: `O limite é ${MAX_IMPORT_SIZE_MB} MB`,
-        variant: "destructive",
-      });
-      return;
-    }
-
+  const executeImport = async (file: File, ext: string) => {
     setLoading(true);
     try {
       if (isApiEnabled()) {
@@ -77,11 +82,64 @@ export default function ExcelImport() {
       });
     } catch (err) {
       console.error("Import error:", err);
-      toast({ title: "Erro na importação", description: err instanceof Error ? err.message : "Verifique o arquivo selecionado", variant: "destructive" });
+      toast({
+        title: "Erro na importação",
+        description: err instanceof Error ? err.message : "Verifique o arquivo selecionado",
+        variant: "destructive",
+      });
     } finally {
       setLoading(false);
-      if (inputRef.current) inputRef.current.value = "";
+      resetSelection();
     }
+  };
+
+  const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const ext = file.name.split(".").pop()?.toLowerCase();
+    if (!["xlsx", "xlsm", "xml"].includes(ext || "")) {
+      toast({
+        title: "Formato inválido",
+        description: "Selecione um arquivo .xlsx, .xlsm ou .xml",
+        variant: "destructive",
+      });
+      resetSelection();
+      return;
+    }
+
+    if (file.size > MAX_IMPORT_SIZE_BYTES) {
+      toast({
+        title: "Arquivo muito grande",
+        description: `O limite é ${MAX_IMPORT_SIZE_MB} MB`,
+        variant: "destructive",
+      });
+      resetSelection();
+      return;
+    }
+
+    if (ext !== "xml" && isApiEnabled() && user?.role !== "admin") {
+      toast({
+        title: "Importação restrita",
+        description: "A importação Excel com substituição total é permitida apenas para administradores.",
+        variant: "destructive",
+      });
+      resetSelection();
+      return;
+    }
+
+    setPendingFile(file);
+    setPendingImportKind(ext === "xml" ? "xml" : "excel");
+    setConfirmationText("");
+    setConfirmOpen(true);
+  };
+
+  const expectedPhrase = pendingImportKind ? IMPORT_CONFIRMATION_PHRASES[pendingImportKind] : "";
+  const canConfirm = !!pendingFile && !!pendingImportKind && confirmationText.trim().toUpperCase() === expectedPhrase;
+
+  const handleConfirmImport = async () => {
+    if (!pendingFile || !pendingImportKind) return;
+    await executeImport(pendingFile, pendingImportKind === "xml" ? "xml" : "xlsx");
   };
 
   return (
@@ -103,6 +161,52 @@ export default function ExcelImport() {
         {loading ? <Loader2 size={14} className="animate-spin" /> : <Upload size={14} />}
         Importar Cronograma
       </Button>
+
+      <Dialog
+        open={confirmOpen}
+        onOpenChange={(open) => {
+          setConfirmOpen(open);
+          if (!open && !loading) resetSelection();
+        }}
+      >
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Confirmar importação destrutiva</DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              {pendingImportKind === "xml"
+                ? "Esta importação substituirá o cronograma existente do projeto encontrado no XML, incluindo tarefas, vínculos e alocações relacionadas."
+                : "Esta importação Excel substituirá em lote os dados importáveis do ambiente, incluindo projetos, tarefas, dependências, alocações e recursos."}
+            </p>
+
+            <div className="rounded-lg border border-warning/30 bg-warning/10 p-3 text-sm text-foreground">
+              Digite <strong>{expectedPhrase}</strong> para confirmar.
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="import-confirmation">Confirmação</Label>
+              <Input
+                id="import-confirmation"
+                value={confirmationText}
+                onChange={(e) => setConfirmationText(e.target.value)}
+                placeholder={expectedPhrase}
+                autoComplete="off"
+              />
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => resetSelection()} disabled={loading}>
+              Cancelar
+            </Button>
+            <Button onClick={() => void handleConfirmImport()} disabled={!canConfirm || loading}>
+              {loading ? "Importando..." : "Confirmar importação"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }

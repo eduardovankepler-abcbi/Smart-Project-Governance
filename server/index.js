@@ -44,6 +44,10 @@ app.set("trust proxy", 1);
 const UPLOAD_DIR = path.resolve(__dirname, "uploads");
 const OLE_XLS_SIGNATURE = Buffer.from([0xD0, 0xCF, 0x11, 0xE0, 0xA1, 0xB1, 0x1A, 0xE1]);
 const ZIP_SIGNATURE = Buffer.from([0x50, 0x4B, 0x03, 0x04]);
+const IMPORT_CONFIRM_PHRASES = {
+  excel: "SUBSTITUIR TUDO",
+  msProject: "SUBSTITUIR CRONOGRAMA",
+};
 
 function ensureDirectory(dirPath) {
   if (!fs.existsSync(dirPath)) fs.mkdirSync(dirPath, { recursive: true });
@@ -121,6 +125,14 @@ function getUploadedFileMetadata(file) {
     mimeType: sanitizeString(file.mimetype, 120),
     size: Number(file.size || 0),
   };
+}
+
+function requireImportConfirmation(req, options) {
+  const mode = sanitizeString(req.body?.importMode, 50).toLowerCase();
+  const confirmationText = sanitizeString(req.body?.confirmationText, 80).toUpperCase();
+  if (mode !== options.mode || confirmationText !== options.phrase) {
+    throw createHttpError(options.errorMessage, "IMPORT_CONFIRMATION_REQUIRED", 400);
+  }
 }
 
 async function logImportEvent(actor, payload) {
@@ -239,13 +251,18 @@ app.use(rateLimit);
 // Auth
 // ============================================
 const API_KEY = process.env.API_KEY;
+const ENABLE_GLOBAL_API_KEY = process.env.ENABLE_GLOBAL_API_KEY === "true";
+
+if (API_KEY && !ENABLE_GLOBAL_API_KEY) {
+  console.warn("Global API_KEY authentication is configured but disabled. Set ENABLE_GLOBAL_API_KEY=true only if strictly necessary.");
+}
 
 app.use(async (req, _res, next) => {
   try {
     const header = req.headers.authorization || "";
     const token = header.startsWith("Bearer ") ? header.slice(7).trim() : "";
     if (!token) return next();
-    if (API_KEY && token === API_KEY) {
+    if (ENABLE_GLOBAL_API_KEY && API_KEY && token === API_KEY) {
       req.authUser = {
         id: 0,
         nome: "Service API Key",
@@ -304,6 +321,14 @@ function requireImportAccess(req, res, next) {
   return res.status(403).json({ error: "Sem permissão para importar cronogramas", code: "AUTH_IMPORT_DENIED" });
 }
 
+function requireReplaceAllImportAccess(req, res, next) {
+  if (req.authUser?.role === ROLES.ADMIN) return next();
+  return res.status(403).json({
+    error: "A importação Excel com substituição total é restrita a administradores",
+    code: "AUTH_IMPORT_REPLACE_DENIED",
+  });
+}
+
 async function getAccessibleProjectIdsFilter(user) {
   if (!user || canSeeAllProjects(user.role)) return { all: true, projectIds: [] };
   if (user.role === ROLES.PMO) {
@@ -338,6 +363,7 @@ const auth = {
   requireWriteAccess,
   requireManageUsers,
   requireImportAccess,
+  requireReplaceAllImportAccess,
   getAccessibleProjectIdsFilter,
   getAccessibleProjectNamesFilter,
 };
@@ -401,7 +427,7 @@ const uploadMsProject = multer({
   },
 });
 
-app.post("/api/import-excel", requireAuth, requireImportAccess, upload.single("file"), async (req, res) => {
+app.post("/api/import-excel", requireAuth, requireReplaceAllImportAccess, upload.single("file"), async (req, res) => {
   if (!req.file) return res.status(400).json({ error: "Nenhum arquivo enviado", code: "NO_FILE" });
 
   const filePath = req.file.path;
@@ -409,6 +435,11 @@ app.post("/api/import-excel", requireAuth, requireImportAccess, upload.single("f
   let imported = { projetos: 0, tarefas: 0, recursos: 0 };
 
   try {
+    requireImportConfirmation(req, {
+      mode: "replace_all",
+      phrase: IMPORT_CONFIRM_PHRASES.excel,
+      errorMessage: `Confirme a operação digitando "${IMPORT_CONFIRM_PHRASES.excel}" para substituir todos os dados importáveis.`,
+    });
     assertExcelFileIntegrity(req.file);
     const workbook = new ExcelJS.Workbook();
     await workbook.xlsx.readFile(filePath);
@@ -549,7 +580,11 @@ app.post("/api/import-excel", requireAuth, requireImportAccess, upload.single("f
         entityType: "excel_import",
         entityId: req.file.originalname,
         summary: `Importação Excel executada (${imported.projetos} projetos, ${imported.tarefas} tarefas, ${imported.recursos} recursos)`,
-        after: { imported, file: fileMetadata },
+        after: {
+          imported,
+          file: fileMetadata,
+          importMode: "replace_all",
+        },
       });
       res.json({ success: true, imported });
     } catch (err) {
@@ -565,7 +600,12 @@ app.post("/api/import-excel", requireAuth, requireImportAccess, upload.single("f
       entityType: "excel_import",
       entityId: req.file.originalname,
       summary: `Falha na importação Excel: ${sanitizeString(err.message, 300)}`,
-      after: { imported, file: fileMetadata, errorCode: err.code || "IMPORT_ERROR" },
+      after: {
+        imported,
+        file: fileMetadata,
+        importMode: sanitizeString(req.body?.importMode, 50),
+        errorCode: err.code || "IMPORT_ERROR",
+      },
     });
     res.status(err.status || 500).json({
       error: err.status ? err.message : "Erro ao importar planilha",
@@ -582,6 +622,11 @@ app.post("/api/import-ms-project", requireAuth, requireImportAccess, uploadMsPro
   const filePath = req.file.path;
   const fileMetadata = getUploadedFileMetadata(req.file);
   try {
+    requireImportConfirmation(req, {
+      mode: "replace_project",
+      phrase: IMPORT_CONFIRM_PHRASES.msProject,
+      errorMessage: `Confirme a operação digitando "${IMPORT_CONFIRM_PHRASES.msProject}" para substituir o cronograma existente do projeto importado.`,
+    });
     assertXmlFileIntegrity(req.file);
     const xmlContent = fs.readFileSync(filePath, "utf8");
     if (/<!DOCTYPE/i.test(xmlContent)) {
@@ -791,6 +836,7 @@ app.post("/api/import-ms-project", requireAuth, requireImportAccess, uploadMsPro
           tarefas: parsed.tasks.length,
           recursos: parsed.resources.length,
           file: fileMetadata,
+          importMode: "replace_project",
         },
       });
       res.json({
@@ -815,7 +861,11 @@ app.post("/api/import-ms-project", requireAuth, requireImportAccess, uploadMsPro
       entityType: "ms_project_import",
       entityId: req.file.originalname,
       summary: `Falha na importação MS Project XML: ${sanitizeString(err.message, 300)}`,
-      after: { file: fileMetadata, errorCode: err.code || "IMPORT_MS_PROJECT" },
+      after: {
+        file: fileMetadata,
+        importMode: sanitizeString(req.body?.importMode, 50),
+        errorCode: err.code || "IMPORT_MS_PROJECT",
+      },
     });
     res.status(err.status || 500).json({
       error: err.status ? err.message : "Erro ao importar XML do MS Project",

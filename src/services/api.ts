@@ -76,6 +76,10 @@ export interface ProjectTemplate {
 }
 
 export const AUTH_TOKEN_STORAGE_KEY = "abc_pm_auth_token";
+const IMPORT_CONFIRMATION_PHRASES = {
+  excel: "SUBSTITUIR TUDO",
+  msProject: "SUBSTITUIR CRONOGRAMA",
+} as const;
 
 function getStoredToken(): string {
   if (typeof window === "undefined") return "";
@@ -452,6 +456,8 @@ export async function importExcel(file: File): Promise<{ success: boolean; impor
   if (!isApiEnabled()) throw new Error("API não configurada. Defina VITE_API_URL no .env");
   const formData = new FormData();
   formData.append("file", file);
+  formData.append("importMode", "replace_all");
+  formData.append("confirmationText", IMPORT_CONFIRMATION_PHRASES.excel);
   const authToken = getStoredToken();
   const res = await fetch(`${API_BASE_URL}/api/import-excel`, {
     method: "POST",
@@ -469,6 +475,8 @@ export async function importMsProject(file: File): Promise<{ success: boolean; i
   if (!isApiEnabled()) throw new Error("API não configurada. A importação do MS Project exige backend ativo.");
   const formData = new FormData();
   formData.append("file", file);
+  formData.append("importMode", "replace_project");
+  formData.append("confirmationText", IMPORT_CONFIRMATION_PHRASES.msProject);
   const authToken = getStoredToken();
   const res = await fetch(`${API_BASE_URL}/api/import-ms-project`, {
     method: "POST",
