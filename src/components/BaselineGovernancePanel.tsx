@@ -334,12 +334,20 @@ export default function BaselineGovernancePanel({ selectedProject }: BaselineGov
 
       <Card className="border-border/80 bg-card/92 shadow-[0_18px_40px_-32px_rgba(15,23,42,0.42)]">
         <CardContent className="space-y-5 p-5">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-            <div className="space-y-1">
-              <h3 className="text-sm font-display font-semibold text-foreground">Curva S Semanal</h3>
-              <p className="text-sm text-muted-foreground">Compare baseline selecionada com a execução atual por esforço, custo ou progresso.</p>
+          <div className="space-y-4">
+            <div className="flex items-start justify-between gap-4">
+              <div className="space-y-1 pr-3">
+                <h3 className="text-sm font-display font-semibold text-foreground">Curva S Semanal</h3>
+                <p className="max-w-xl text-sm text-muted-foreground">Compare baseline selecionada com a execução atual por esforço, custo ou progresso.</p>
+              </div>
+              <ChartPreviewModal
+                title="Curva S Semanal"
+                description="Visualização ampliada da comparação entre baseline e execução atual."
+                renderChart={renderCurveChart}
+                expandedHeight={640}
+              />
             </div>
-            <div className="flex flex-wrap items-end gap-3">
+            <div className="flex flex-wrap items-end justify-end gap-3">
               <Select value={curveMetric} onValueChange={(value) => setCurveMetric(value as ProjectCurveSResponse["metric"])}>
                 <SelectTrigger className="w-40">
                   <SelectValue placeholder="Métrica" />
@@ -362,12 +370,6 @@ export default function BaselineGovernancePanel({ selectedProject }: BaselineGov
                   ))}
                 </SelectContent>
               </Select>
-              <ChartPreviewModal
-                title="Curva S Semanal"
-                description="Visualização ampliada da comparação entre baseline e execução atual."
-                renderChart={renderCurveChart}
-                expandedHeight={640}
-              />
             </div>
           </div>
 
