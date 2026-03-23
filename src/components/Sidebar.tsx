@@ -1,20 +1,156 @@
 import { NavLink } from "react-router-dom";
-import { LayoutDashboard, FolderKanban, ListTodo, GanttChart, Users, ClipboardList, Shield, Link2, Gauge, History } from "lucide-react";
+import {
+  LayoutDashboard,
+  FolderKanban,
+  ListTodo,
+  GanttChart,
+  Users,
+  ClipboardList,
+  Shield,
+  Link2,
+  Gauge,
+  History,
+  BarChart3,
+  TrendingUp,
+  GitBranch,
+  Boxes,
+  Building2,
+  UserCog,
+  KeyRound,
+  CalendarRange,
+  DollarSign,
+  CheckSquare,
+  Timer,
+  AlertTriangle,
+  MessageSquare,
+  ScrollText,
+  Milestone,
+  Briefcase,
+} from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import logo from "@/assets/logo_abc.png";
 import { useAuth } from "@/contexts/AuthContext";
 
 const navItems = [
-  { to: "/", label: "Dashboard", icon: LayoutDashboard },
-  { to: "/cadastro", label: "Cadastro", icon: ClipboardList, canSee: (role?: string) => role === "admin" || role === "pmo" },
-  { to: "/governanca", label: "Governança", icon: Shield, canSee: (role?: string) => role === "admin" || role === "pmo" },
-  { to: "/projetos", label: "Projetos", icon: FolderKanban },
-  { to: "/tarefas", label: "Tarefas", icon: ListTodo },
-  { to: "/alocacoes", label: "Alocações", icon: Link2 },
-  { to: "/capacidade", label: "Capacidade", icon: Gauge, canSee: (role?: string) => role === "admin" || role === "pmo" || role === "bi" },
-  { to: "/historico", label: "Histórico", icon: History },
-  { to: "/gantt", label: "Gantt", icon: GanttChart },
-  { to: "/recursos", label: "Recursos", icon: Users },
+  {
+    to: "/",
+    label: "Dashboard",
+    icon: LayoutDashboard,
+    subItems: [
+      { icon: TrendingUp, label: "KPIs" },
+      { icon: BarChart3, label: "Gráficos" },
+      { icon: GitBranch, label: "Curva S" },
+    ],
+  },
+  {
+    to: "/cadastro",
+    label: "Cadastro",
+    icon: ClipboardList,
+    subItems: [
+      { icon: FolderKanban, label: "Projetos" },
+      { icon: ListTodo, label: "Tarefas" },
+      { icon: Boxes, label: "Produtos e BU" },
+    ],
+    canSee: (role?: string) => role === "admin" || role === "pmo",
+  },
+  {
+    to: "/governanca",
+    label: "Governança",
+    icon: Shield,
+    subItems: [
+      { icon: UserCog, label: "Usuários" },
+      { icon: Shield, label: "Perfis" },
+      { icon: KeyRound, label: "Acessos" },
+    ],
+    canSee: (role?: string) => role === "admin" || role === "pmo",
+  },
+  {
+    to: "/projetos",
+    label: "Projetos",
+    icon: FolderKanban,
+    subItems: [
+      { icon: CalendarRange, label: "Prazos" },
+      { icon: DollarSign, label: "Custos" },
+      { icon: Building2, label: "Portfólio" },
+    ],
+  },
+  {
+    to: "/tarefas",
+    label: "Tarefas",
+    icon: ListTodo,
+    subItems: [
+      { icon: CheckSquare, label: "Execução" },
+      { icon: GitBranch, label: "Hierarquia" },
+      { icon: Timer, label: "Duração" },
+    ],
+  },
+  {
+    to: "/alocacoes",
+    label: "Alocações",
+    icon: Link2,
+    subItems: [
+      { icon: Users, label: "Recursos" },
+      { icon: Briefcase, label: "Carga" },
+      { icon: DollarSign, label: "Custos" },
+    ],
+  },
+  {
+    to: "/capacidade",
+    label: "Capacidade",
+    icon: Gauge,
+    subItems: [
+      { icon: Gauge, label: "Utilização" },
+      { icon: Users, label: "Equipe" },
+      { icon: AlertTriangle, label: "Riscos" },
+    ],
+    canSee: (role?: string) => role === "admin" || role === "pmo" || role === "bi",
+  },
+  {
+    to: "/historico",
+    label: "Histórico",
+    icon: History,
+    subItems: [
+      { icon: History, label: "Auditoria" },
+      { icon: MessageSquare, label: "Comentários" },
+      { icon: ScrollText, label: "Registros" },
+    ],
+  },
+  {
+    to: "/gantt",
+    label: "Gantt",
+    icon: GanttChart,
+    subItems: [
+      { icon: Milestone, label: "Marcos" },
+      { icon: CalendarRange, label: "Linha do tempo" },
+      { icon: GitBranch, label: "Dependências" },
+    ],
+  },
+  {
+    to: "/recursos",
+    label: "Recursos",
+    icon: Users,
+    subItems: [
+      { icon: Users, label: "Equipe" },
+      { icon: Briefcase, label: "Especialidades" },
+      { icon: Gauge, label: "Capacidade" },
+    ],
+  },
 ];
+
+function MiniIcon({ icon: Icon, label, active }: { icon: LucideIcon; label: string; active: boolean }) {
+  return (
+    <span
+      title={label}
+      className={`flex h-5 w-5 items-center justify-center rounded-md border transition-colors ${
+        active
+          ? "border-white/20 bg-white/12 text-sidebar-primary-foreground/88"
+          : "border-white/8 bg-white/[0.03] text-sidebar-foreground/48 group-hover:border-white/12 group-hover:text-sidebar-foreground/65"
+      }`}
+    >
+      <Icon size={11} />
+    </span>
+  );
+}
 
 export default function Sidebar() {
   const { user } = useAuth();
@@ -36,23 +172,36 @@ export default function Sidebar() {
         </div>
       </div>
       <nav className="flex flex-1 flex-col gap-1 px-3 py-4">
-        {visibleItems.map(({ to, label, icon: Icon }) => (
+        {visibleItems.map(({ to, label, icon: Icon, subItems }) => (
           <NavLink
             key={to}
             to={to}
             end={to === "/"}
             className={({ isActive }) =>
-              `group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all ${
+              `group flex items-start gap-3 rounded-xl px-3 py-3 text-sm font-medium transition-all ${
                 isActive
                   ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-[0_10px_30px_-18px_rgba(239,68,68,0.95)]"
                   : "text-sidebar-foreground/72 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
               }`
             }
           >
-            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/5 transition-colors group-hover:bg-white/10">
-              <Icon size={16} />
-            </span>
-            {label}
+            {({ isActive }) => (
+              <>
+                <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/5 transition-colors group-hover:bg-white/10">
+                  <Icon size={16} />
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate">{label}</span>
+                  {subItems?.length ? (
+                    <span className="mt-2 flex flex-wrap gap-1.5">
+                      {subItems.map((item) => (
+                        <MiniIcon key={`${to}-${item.label}`} icon={item.icon} label={item.label} active={isActive} />
+                      ))}
+                    </span>
+                  ) : null}
+                </span>
+              </>
+            )}
           </NavLink>
         ))}
       </nav>
