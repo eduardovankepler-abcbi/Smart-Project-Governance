@@ -13,6 +13,7 @@ import * as api from "@/services/api";
 import { isApiEnabled } from "@/config/api";
 import RecursoDialog from "@/components/RecursoDialog";
 import DeleteDialog from "@/components/DeleteDialog";
+import ChartPreviewModal from "@/components/ChartPreviewModal";
 import type { Recurso } from "@/data/projectData";
 import { getTaskResourceNames } from "@/utils/projectModel";
 
@@ -109,6 +110,21 @@ export default function RecursosPage() {
   const totalComTarefas = recursosInfo.filter(r => r.totalTarefas > 0).length;
   const totalAtrasadas = recursosInfo.reduce((s, r) => s + r.tarefasAtrasadas, 0);
 
+  const renderResourceWorkloadChart = (height: number) => (
+    <ResponsiveContainer width="100%" height={height}>
+      <BarChart data={chartData} margin={{ left: 10 }}>
+        <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+        <XAxis dataKey="name" tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} />
+        <YAxis tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} />
+        <Tooltip contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: "8px", color: "hsl(var(--foreground))" }} />
+        <Bar dataKey="atrasadas" name="Atrasadas" stackId="a" fill="hsl(var(--destructive))" />
+        <Bar dataKey="andamento" name="Em Andamento" stackId="a" fill="hsl(var(--warning))" />
+        <Bar dataKey="concluidas" name="Concluídas" stackId="a" fill="hsl(var(--success))" />
+        <Bar dataKey="naoIniciadas" name="Não Iniciadas" stackId="a" fill="hsl(var(--muted-foreground))" radius={[4, 4, 0, 0]} />
+      </BarChart>
+    </ResponsiveContainer>
+  );
+
   const handleDelete = async () => {
     if (!deleteTarget) return;
     setDeleting(true);
@@ -184,19 +200,15 @@ export default function RecursosPage() {
 
         <Card className="border border-border">
           <CardContent className="p-5">
-            <h3 className="text-sm font-display font-semibold text-foreground mb-4">Carga de Trabalho por Recurso</h3>
-            <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={chartData} margin={{ left: 10 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                <XAxis dataKey="name" tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} />
-                <YAxis tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} />
-                <Tooltip contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: "8px", color: "hsl(var(--foreground))" }} />
-                <Bar dataKey="atrasadas" name="Atrasadas" stackId="a" fill="hsl(var(--destructive))" />
-                <Bar dataKey="andamento" name="Em Andamento" stackId="a" fill="hsl(var(--warning))" />
-                <Bar dataKey="concluidas" name="Concluídas" stackId="a" fill="hsl(var(--success))" />
-                <Bar dataKey="naoIniciadas" name="Não Iniciadas" stackId="a" fill="hsl(var(--muted-foreground))" radius={[4, 4, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
+            <div className="mb-4 flex items-center justify-between gap-4">
+              <h3 className="text-sm font-display font-semibold text-foreground">Carga de Trabalho por Recurso</h3>
+              <ChartPreviewModal
+                title="Carga de Trabalho por Recurso"
+                description="Visualização ampliada da distribuição de tarefas por recurso."
+                renderChart={renderResourceWorkloadChart}
+              />
+            </div>
+            {renderResourceWorkloadChart(300)}
           </CardContent>
         </Card>
 

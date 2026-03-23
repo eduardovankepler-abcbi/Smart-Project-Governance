@@ -13,6 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { ResponsiveContainer, CartesianGrid, Legend, Line, LineChart, Tooltip, XAxis, YAxis } from "recharts";
 import { formatCurrency } from "@/contexts/DataContext";
 import { GitBranchPlus, ShieldCheck } from "lucide-react";
+import ChartPreviewModal from "@/components/ChartPreviewModal";
 
 interface BaselineGovernancePanelProps {
   selectedProject: Projeto | null;
@@ -35,6 +36,10 @@ function getStatusBadgeVariant(status: ProjectBaseline["status"]) {
   if (status === "approved") return "default";
   if (status === "pending_approval") return "secondary";
   return "destructive";
+}
+
+function buildCurveTooltipStyle() {
+  return { background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: "8px", color: "hsl(var(--foreground))" };
 }
 
 export default function BaselineGovernancePanel({ selectedProject }: BaselineGovernancePanelProps) {
@@ -60,6 +65,7 @@ export default function BaselineGovernancePanel({ selectedProject }: BaselineGov
     () => baselines.filter((baseline) => baseline.status === "pending_approval"),
     [baselines]
   );
+  const curveTooltipStyle = useMemo(() => buildCurveTooltipStyle(), []);
 
   useEffect(() => {
     async function loadBaselines() {
@@ -184,6 +190,28 @@ export default function BaselineGovernancePanel({ selectedProject }: BaselineGov
       </Card>
     );
   }
+
+  const renderCurveChart = (height: number) => (
+    <ResponsiveContainer width="100%" height={height}>
+      <LineChart data={curveData?.points || []}>
+        <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+        <XAxis dataKey="label" tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} />
+        <YAxis
+          tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
+          tickFormatter={(value) => curveMetric === "cost" ? `R$${(value / 1000).toFixed(0)}k` : curveMetric === "progress" ? `${value}%` : `${value}h`}
+        />
+        <Tooltip
+          contentStyle={curveTooltipStyle}
+          formatter={(value: number, key: string) => [formatMetricValue(curveMetric, value), key === "planned" ? "Planejado" : key === "actual" ? "Realizado" : "Desvio"]}
+          labelFormatter={(label) => `Semana de ${label}`}
+        />
+        <Legend />
+        <Line type="monotone" dataKey="planned" name="Planejado" stroke="hsl(217, 91%, 60%)" strokeWidth={2} dot={false} />
+        <Line type="monotone" dataKey="actual" name="Realizado" stroke="hsl(142, 71%, 40%)" strokeWidth={2} dot={false} />
+        <Line type="monotone" dataKey="variance" name="Desvio" stroke="hsl(0, 78%, 45%)" strokeWidth={2} dot={false} />
+      </LineChart>
+    </ResponsiveContainer>
+  );
 
   return (
     <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1.1fr_1.4fr]">
@@ -311,7 +339,7 @@ export default function BaselineGovernancePanel({ selectedProject }: BaselineGov
               <h3 className="text-sm font-display font-semibold text-foreground">Curva S Semanal</h3>
               <p className="text-sm text-muted-foreground">Compare baseline selecionada com a execução atual por esforço, custo ou progresso.</p>
             </div>
-            <div className="flex flex-wrap gap-3">
+            <div className="flex flex-wrap items-end gap-3">
               <Select value={curveMetric} onValueChange={(value) => setCurveMetric(value as ProjectCurveSResponse["metric"])}>
                 <SelectTrigger className="w-40">
                   <SelectValue placeholder="Métrica" />
@@ -334,6 +362,12 @@ export default function BaselineGovernancePanel({ selectedProject }: BaselineGov
                   ))}
                 </SelectContent>
               </Select>
+              <ChartPreviewModal
+                title="Curva S Semanal"
+                description="Visualização ampliada da comparação entre baseline e execução atual."
+                renderChart={renderCurveChart}
+                expandedHeight={640}
+              />
             </div>
           </div>
 
@@ -366,25 +400,7 @@ export default function BaselineGovernancePanel({ selectedProject }: BaselineGov
               Calculando curva S...
             </div>
           ) : curveData && curveData.points.length > 0 ? (
-            <ResponsiveContainer width="100%" height={360}>
-              <LineChart data={curveData.points}>
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                <XAxis dataKey="label" tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} />
-                <YAxis
-                  tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
-                  tickFormatter={(value) => curveMetric === "cost" ? `R$${(value / 1000).toFixed(0)}k` : curveMetric === "progress" ? `${value}%` : `${value}h`}
-                />
-                <Tooltip
-                  contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: "8px", color: "hsl(var(--foreground))" }}
-                  formatter={(value: number, key: string) => [formatMetricValue(curveMetric, value), key === "planned" ? "Planejado" : key === "actual" ? "Realizado" : "Desvio"]}
-                  labelFormatter={(label) => `Semana de ${label}`}
-                />
-                <Legend />
-                <Line type="monotone" dataKey="planned" name="Planejado" stroke="hsl(217, 91%, 60%)" strokeWidth={2} dot={false} />
-                <Line type="monotone" dataKey="actual" name="Realizado" stroke="hsl(142, 71%, 40%)" strokeWidth={2} dot={false} />
-                <Line type="monotone" dataKey="variance" name="Desvio" stroke="hsl(0, 78%, 45%)" strokeWidth={2} dot={false} />
-              </LineChart>
-            </ResponsiveContainer>
+            renderCurveChart(360)
           ) : (
             <div className="rounded-xl border border-dashed border-border/70 bg-background/40 p-6 text-sm text-muted-foreground">
               Ainda não há dados suficientes para montar a curva S desta baseline.

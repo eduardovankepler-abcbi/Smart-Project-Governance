@@ -9,6 +9,7 @@ import { Progress } from "@/components/ui/progress";
 import { AlertTriangle, CheckCircle2, Gauge, Users } from "lucide-react";
 import { ResponsiveContainer, BarChart, Bar, CartesianGrid, XAxis, YAxis, Tooltip } from "recharts";
 import { getTaskResourceNames } from "@/utils/projectModel";
+import ChartPreviewModal from "@/components/ChartPreviewModal";
 
 interface CapacityAssignment {
   resourceId?: number;
@@ -198,6 +199,26 @@ export default function CapacidadePage() {
     ocupacao: Number(item.occupancyPct.toFixed(1)),
   }));
 
+  const renderCapacityChart = (height: number) => (
+    <ResponsiveContainer width="100%" height={height}>
+      <BarChart data={chartData} margin={{ left: 10 }}>
+        <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+        <XAxis dataKey="nome" tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} />
+        <YAxis tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} />
+        <Tooltip
+          formatter={(value: number) => [`${value}%`, "Ocupação"]}
+          contentStyle={{
+            background: "hsl(var(--card))",
+            border: "1px solid hsl(var(--border))",
+            borderRadius: "8px",
+            color: "hsl(var(--foreground))",
+          }}
+        />
+        <Bar dataKey="ocupacao" fill="hsl(var(--primary))" radius={[6, 6, 0, 0]} />
+      </BarChart>
+    </ResponsiveContainer>
+  );
+
   return (
     <div className="flex flex-col">
       <Header title="Capacidade" />
@@ -285,24 +306,13 @@ export default function CapacidadePage() {
                 <h3 className="text-sm font-display font-semibold text-foreground">Ocupação por recurso</h3>
                 <p className="text-xs text-muted-foreground">Percentual alocado em relação à capacidade máxima cadastrada.</p>
               </div>
+              <ChartPreviewModal
+                title="Ocupação por recurso"
+                description="Visualização ampliada da ocupação dos recursos em relação à capacidade máxima cadastrada."
+                renderChart={renderCapacityChart}
+              />
             </div>
-            <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={chartData} margin={{ left: 10 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                <XAxis dataKey="nome" tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} />
-                <YAxis tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} />
-                <Tooltip
-                  formatter={(value: number) => [`${value}%`, "Ocupação"]}
-                  contentStyle={{
-                    background: "hsl(var(--card))",
-                    border: "1px solid hsl(var(--border))",
-                    borderRadius: "8px",
-                    color: "hsl(var(--foreground))",
-                  }}
-                />
-                <Bar dataKey="ocupacao" fill="hsl(var(--primary))" radius={[6, 6, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
+            {renderCapacityChart(300)}
           </CardContent>
         </Card>
 
