@@ -11,21 +11,10 @@ import {
   Gauge,
   History,
   BarChart3,
-  TrendingUp,
   GitBranch,
   Boxes,
   Building2,
-  UserCog,
-  KeyRound,
-  CalendarRange,
-  DollarSign,
-  CheckSquare,
-  Timer,
-  AlertTriangle,
   MessageSquare,
-  ScrollText,
-  Milestone,
-  Briefcase,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import logo from "@/assets/logo_abc.png";
@@ -37,9 +26,8 @@ const navItems = [
     label: "Dashboard",
     icon: LayoutDashboard,
     subItems: [
-      { icon: TrendingUp, label: "KPIs" },
-      { icon: BarChart3, label: "Gráficos" },
-      { icon: GitBranch, label: "Curva S" },
+      { to: "/?tab=resumo", icon: BarChart3, label: "Resumo" },
+      { to: "/?tab=curva-s", icon: GitBranch, label: "Curva S" },
     ],
   },
   {
@@ -47,9 +35,11 @@ const navItems = [
     label: "Cadastro",
     icon: ClipboardList,
     subItems: [
-      { icon: FolderKanban, label: "Projetos" },
-      { icon: ListTodo, label: "Tarefas" },
-      { icon: Boxes, label: "Produtos e BU" },
+      { to: "/cadastro?tab=business-units", icon: Building2, label: "BUs" },
+      { to: "/cadastro?tab=produtos", icon: Boxes, label: "Produtos" },
+      { to: "/cadastro?tab=projetos", icon: FolderKanban, label: "Projetos" },
+      { to: "/cadastro?tab=tarefas", icon: ListTodo, label: "Tarefas" },
+      { to: "/cadastro?tab=recursos", icon: Users, label: "Recursos" },
     ],
     canSee: (role?: string) => role === "admin" || role === "pmo",
   },
@@ -57,52 +47,27 @@ const navItems = [
     to: "/governanca",
     label: "Governança",
     icon: Shield,
-    subItems: [
-      { icon: UserCog, label: "Usuários" },
-      { icon: Shield, label: "Perfis" },
-      { icon: KeyRound, label: "Acessos" },
-    ],
     canSee: (role?: string) => role === "admin" || role === "pmo",
   },
   {
     to: "/projetos",
     label: "Projetos",
     icon: FolderKanban,
-    subItems: [
-      { icon: CalendarRange, label: "Prazos" },
-      { icon: DollarSign, label: "Custos" },
-      { icon: Building2, label: "Portfólio" },
-    ],
   },
   {
     to: "/tarefas",
     label: "Tarefas",
     icon: ListTodo,
-    subItems: [
-      { icon: CheckSquare, label: "Execução" },
-      { icon: GitBranch, label: "Hierarquia" },
-      { icon: Timer, label: "Duração" },
-    ],
   },
   {
     to: "/alocacoes",
     label: "Alocações",
     icon: Link2,
-    subItems: [
-      { icon: Users, label: "Recursos" },
-      { icon: Briefcase, label: "Carga" },
-      { icon: DollarSign, label: "Custos" },
-    ],
   },
   {
     to: "/capacidade",
     label: "Capacidade",
     icon: Gauge,
-    subItems: [
-      { icon: Gauge, label: "Utilização" },
-      { icon: Users, label: "Equipe" },
-      { icon: AlertTriangle, label: "Riscos" },
-    ],
     canSee: (role?: string) => role === "admin" || role === "pmo" || role === "bi",
   },
   {
@@ -110,51 +75,68 @@ const navItems = [
     label: "Histórico",
     icon: History,
     subItems: [
-      { icon: History, label: "Auditoria" },
-      { icon: MessageSquare, label: "Comentários" },
-      { icon: ScrollText, label: "Registros" },
+      { to: "/historico?tab=comentarios", icon: MessageSquare, label: "Comentários" },
+      { to: "/historico?tab=auditoria", icon: History, label: "Auditoria", canSee: (role?: string) => role === "admin" || role === "pmo" },
     ],
   },
   {
     to: "/gantt",
     label: "Gantt",
     icon: GanttChart,
-    subItems: [
-      { icon: Milestone, label: "Marcos" },
-      { icon: CalendarRange, label: "Linha do tempo" },
-      { icon: GitBranch, label: "Dependências" },
-    ],
   },
   {
     to: "/recursos",
     label: "Recursos",
     icon: Users,
-    subItems: [
-      { icon: Users, label: "Equipe" },
-      { icon: Briefcase, label: "Especialidades" },
-      { icon: Gauge, label: "Capacidade" },
-    ],
   },
 ];
 
-function MiniIcon({ icon: Icon, label, active }: { icon: LucideIcon; label: string; active: boolean }) {
+function MiniNavItem({
+  to,
+  icon: Icon,
+  label,
+}: {
+  to: string;
+  icon: LucideIcon;
+  label: string;
+}) {
   return (
-    <span
-      title={label}
-      className={`flex h-5 w-5 items-center justify-center rounded-md border transition-colors ${
-        active
-          ? "border-white/20 bg-white/12 text-sidebar-primary-foreground/88"
-          : "border-white/8 bg-white/[0.03] text-sidebar-foreground/48 group-hover:border-white/12 group-hover:text-sidebar-foreground/65"
-      }`}
+    <NavLink
+      to={to}
+      className={({ isActive }) =>
+        `flex items-center gap-2 rounded-lg px-2 py-1.5 text-[11px] transition-colors ${
+          isActive
+            ? "bg-white/12 text-sidebar-primary-foreground"
+            : "text-sidebar-foreground/58 hover:bg-white/[0.05] hover:text-sidebar-foreground/88"
+        }`
+      }
     >
-      <Icon size={11} />
-    </span>
+      {({ isActive }) => (
+        <>
+          <span
+            className={`flex h-5 w-5 items-center justify-center rounded-md border ${
+              isActive
+                ? "border-white/20 bg-white/10 text-sidebar-primary-foreground"
+                : "border-white/10 bg-white/[0.03]"
+            }`}
+          >
+            <Icon size={11} />
+          </span>
+          <span className="truncate">{label}</span>
+        </>
+      )}
+    </NavLink>
   );
 }
 
 export default function Sidebar() {
   const { user } = useAuth();
-  const visibleItems = navItems.filter((item) => !item.canSee || item.canSee(user?.role));
+  const visibleItems = navItems
+    .filter((item) => !item.canSee || item.canSee(user?.role))
+    .map((item) => ({
+      ...item,
+      subItems: item.subItems?.filter((subItem) => !subItem.canSee || subItem.canSee(user?.role)) || [],
+    }));
 
   return (
     <aside className="fixed left-0 top-0 z-40 flex h-screen w-60 flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground">
@@ -173,36 +155,34 @@ export default function Sidebar() {
       </div>
       <nav className="flex flex-1 flex-col gap-1 px-3 py-4">
         {visibleItems.map(({ to, label, icon: Icon, subItems }) => (
-          <NavLink
-            key={to}
-            to={to}
-            end={to === "/"}
-            className={({ isActive }) =>
-              `group flex items-start gap-3 rounded-xl px-3 py-3 text-sm font-medium transition-all ${
-                isActive
-                  ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-[0_10px_30px_-18px_rgba(239,68,68,0.95)]"
-                  : "text-sidebar-foreground/72 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-              }`
-            }
-          >
-            {({ isActive }) => (
-              <>
-                <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/5 transition-colors group-hover:bg-white/10">
-                  <Icon size={16} />
-                </span>
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate">{label}</span>
-                  {subItems?.length ? (
-                    <span className="mt-2 flex flex-wrap gap-1.5">
-                      {subItems.map((item) => (
-                        <MiniIcon key={`${to}-${item.label}`} icon={item.icon} label={item.label} active={isActive} />
-                      ))}
-                    </span>
-                  ) : null}
-                </span>
-              </>
-            )}
-          </NavLink>
+          <div key={to} className="space-y-1.5">
+            <NavLink
+              to={to}
+              end={to === "/"}
+              className={({ isActive }) =>
+                `group flex items-start gap-3 rounded-xl px-3 py-3 text-sm font-medium transition-all ${
+                  isActive
+                    ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-[0_10px_30px_-18px_rgba(239,68,68,0.95)]"
+                    : "text-sidebar-foreground/72 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                }`
+              }
+            >
+              <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/5 transition-colors group-hover:bg-white/10">
+                <Icon size={16} />
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block truncate">{label}</span>
+              </span>
+            </NavLink>
+
+            {subItems.length ? (
+              <div className="ml-11 flex flex-col gap-1">
+                {subItems.map((item) => (
+                  <MiniNavItem key={`${to}-${item.label}`} to={item.to} icon={item.icon} label={item.label} />
+                ))}
+              </div>
+            ) : null}
+          </div>
         ))}
       </nav>
       <div className="border-t border-sidebar-border px-4 py-4">

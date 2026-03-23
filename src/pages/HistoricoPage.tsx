@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import Header from "@/components/Header";
 import { useData } from "@/contexts/DataContext";
 import { useAuth } from "@/contexts/AuthContext";
@@ -23,10 +24,13 @@ function formatDateTime(value?: string) {
 }
 
 export default function HistoricoPage() {
+  const [searchParams, setSearchParams] = useSearchParams();
   const { projetos, tarefas } = useData();
   const { canWrite, hasRole } = useAuth();
   const { toast } = useToast();
-  const [tab, setTab] = useState("comentarios");
+  const requestedTab = searchParams.get("tab");
+  const initialTab = requestedTab === "auditoria" ? "auditoria" : "comentarios";
+  const [tab, setTab] = useState(initialTab);
   const [comments, setComments] = useState<Comentario[]>([]);
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
   const [loadingComments, setLoadingComments] = useState(false);
@@ -39,6 +43,11 @@ export default function HistoricoPage() {
   const [auditSearch, setAuditSearch] = useState("");
   const [auditEntityType, setAuditEntityType] = useState("all");
   const canSeeAudit = hasRole("admin", "pmo");
+
+  useEffect(() => {
+    const nextTab = requestedTab === "auditoria" && canSeeAudit ? "auditoria" : "comentarios";
+    setTab(nextTab);
+  }, [requestedTab, canSeeAudit]);
 
   const filteredTasks = useMemo(() => {
     if (projectId === "all") return tarefas;
@@ -140,7 +149,13 @@ export default function HistoricoPage() {
     <div className="flex flex-col">
       <Header title="Histórico" />
       <div className="space-y-6 p-6 animate-fade-in">
-        <Tabs value={tab} onValueChange={setTab} className="space-y-4">
+        <Tabs value={tab} onValueChange={(value) => {
+          const nextTab = value === "auditoria" && canSeeAudit ? "auditoria" : "comentarios";
+          setTab(nextTab);
+          const next = new URLSearchParams(searchParams);
+          next.set("tab", nextTab);
+          setSearchParams(next, { replace: true });
+        }} className="space-y-4">
           <TabsList>
             <TabsTrigger value="comentarios">Comentários</TabsTrigger>
             {canSeeAudit ? <TabsTrigger value="auditoria">Auditoria</TabsTrigger> : null}

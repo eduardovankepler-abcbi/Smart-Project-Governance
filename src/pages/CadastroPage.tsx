@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import Header from "@/components/Header";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -15,6 +16,7 @@ import type { BusinessUnit, Produto, Projeto, Recurso, Tarefa } from "@/data/pro
 import { getTaskBusinessId, getTaskDisplayHierarchy, MAX_TASK_WBS_DEPTH } from "@/utils/taskIdentity";
 
 export default function CadastroPage() {
+  const [searchParams, setSearchParams] = useSearchParams();
   const { businessUnits, produtos, projetos, tarefas, recursos } = useData();
   const [businessUnitOpen, setBusinessUnitOpen] = useState(false);
   const [selectedBusinessUnit, setSelectedBusinessUnit] = useState<(BusinessUnit & { id?: number }) | null>(null);
@@ -57,6 +59,9 @@ export default function CadastroPage() {
     setSelectedRecurso(null);
     setRecursoOpen(true);
   };
+
+  const allowedTabs = new Set(["business-units", "produtos", "projetos", "tarefas", "recursos"]);
+  const activeTab = allowedTabs.has(searchParams.get("tab") || "") ? (searchParams.get("tab") as string) : "projetos";
 
   return (
     <div className="flex flex-col">
@@ -118,7 +123,11 @@ export default function CadastroPage() {
           </Card>
         </div>
 
-        <Tabs defaultValue="projetos" className="space-y-4">
+        <Tabs value={activeTab} onValueChange={(value) => {
+          const next = new URLSearchParams(searchParams);
+          next.set("tab", value);
+          setSearchParams(next, { replace: true });
+        }} className="space-y-4">
           <TabsList>
             <TabsTrigger value="business-units">Unidades de Negócio</TabsTrigger>
             <TabsTrigger value="produtos">Produtos</TabsTrigger>

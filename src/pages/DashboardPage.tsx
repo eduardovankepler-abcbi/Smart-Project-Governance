@@ -1,4 +1,5 @@
-import { useState, useMemo } from "react";
+import { useMemo } from "react";
+import { useSearchParams } from "react-router-dom";
 import Header from "@/components/Header";
 import { useData, formatCurrency } from "@/contexts/DataContext";
 import { Card, CardContent } from "@/components/ui/card";
@@ -31,7 +32,9 @@ function parseDate(dateStr: string): Date | null {
 
 export default function DashboardPage() {
   const { projetos, tarefas, getUniqueProjetos } = useData();
-  const [filterProjeto, setFilterProjeto] = useState<string>("all");
+  const [searchParams, setSearchParams] = useSearchParams();
+  const filterProjeto = searchParams.get("projeto") || "all";
+  const activeTab = searchParams.get("tab") === "curva-s" ? "curva-s" : "resumo";
   const projetosUnicos = useMemo(() => getUniqueProjetos(), [getUniqueProjetos]);
 
   const filteredProjetos = useMemo(() => {
@@ -131,6 +134,13 @@ export default function DashboardPage() {
 
   const tooltipStyle = { background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: "8px", color: "hsl(var(--foreground))" };
 
+  const updateSearchParam = (key: string, value: string) => {
+    const next = new URLSearchParams(searchParams);
+    if (!value || value === "all") next.delete(key);
+    else next.set(key, value);
+    setSearchParams(next, { replace: true });
+  };
+
   return (
     <div className="flex flex-col">
       <Header title="Dashboard" />
@@ -144,7 +154,7 @@ export default function DashboardPage() {
             </p>
           </div>
           <div className="flex flex-wrap gap-3">
-            <Select value={filterProjeto} onValueChange={setFilterProjeto}>
+            <Select value={filterProjeto} onValueChange={(value) => updateSearchParam("projeto", value)}>
               <SelectTrigger className="w-60 rounded-xl border-border/80 bg-background/80">
                 <SelectValue placeholder="Projeto" />
               </SelectTrigger>
@@ -156,7 +166,7 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        <Tabs defaultValue="resumo" className="space-y-6">
+        <Tabs value={activeTab} onValueChange={(value) => updateSearchParam("tab", value)} className="space-y-6">
           <TabsList className="grid w-full max-w-md grid-cols-2">
             <TabsTrigger value="resumo">Resumo</TabsTrigger>
             <TabsTrigger value="curva-s">Curva S</TabsTrigger>
