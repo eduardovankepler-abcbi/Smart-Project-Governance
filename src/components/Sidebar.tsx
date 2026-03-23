@@ -139,7 +139,7 @@ export default function Sidebar() {
     }));
 
   return (
-    <aside className="fixed left-0 top-0 z-40 flex h-screen w-60 flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground">
+    <aside className="fixed left-0 top-0 z-40 flex h-screen w-60 flex-col overflow-hidden border-r border-sidebar-border bg-sidebar text-sidebar-foreground">
       <div className="border-b border-sidebar-border px-4 py-4">
         <div className="rounded-2xl border border-white/10 bg-white/95 px-4 py-4 text-slate-900 shadow-sm">
           <div className="flex items-center gap-3">
@@ -153,7 +153,8 @@ export default function Sidebar() {
           </p>
         </div>
       </div>
-      <nav className="flex flex-1 flex-col gap-1 px-3 py-4">
+      <nav className="min-h-0 flex-1 overflow-y-auto px-3 py-4">
+        <div className="flex flex-col gap-1 pb-4">
         {visibleItems.map(({ to, label, icon: Icon, subItems }) => (
           <div key={to} className="space-y-1.5">
             <NavLink
@@ -184,6 +185,7 @@ export default function Sidebar() {
             ) : null}
           </div>
         ))}
+        </div>
       </nav>
       <div className="border-t border-sidebar-border px-4 py-4">
         <div className="rounded-2xl border border-white/8 bg-white/[0.03] px-3 py-3">
