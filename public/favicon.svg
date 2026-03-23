@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-labelledby="title">
+  <title>Smart Project</title>
+  <defs>
+    <linearGradient id="brand" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ff5a47" />
+      <stop offset="100%" stop-color="#d62416" />
+    </linearGradient>
+  </defs>
+
+  <g fill="none" stroke="url(#brand)" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M17 10c-4.9 2.6-8.5 6.6-10 11.7" stroke-width="2.7" opacity="0.85" />
+    <path d="M47 10c4.9 2.6 8.5 6.6 10 11.7" stroke-width="2.7" opacity="0.85" />
+    <path d="M17 54c-4.9-2.6-8.5-6.6-10-11.7" stroke-width="2.7" opacity="0.85" />
+    <path d="M47 54c4.9-2.6 8.5-6.6 10-11.7" stroke-width="2.7" opacity="0.85" />
+
+    <path d="M32 6 58 32 32 58 6 32Z" stroke-width="4.4" />
+    <path d="M32 16 48 32 32 48 16 32Z" stroke-width="2.6" opacity="0.9" />
+    <path d="M32 14v36M14 32h36" stroke-width="2.3" opacity="0.9" />
+    <path d="m22 22 20 20M42 22 22 42" stroke-width="2.1" opacity="0.82" />
+  </g>
+</svg>
