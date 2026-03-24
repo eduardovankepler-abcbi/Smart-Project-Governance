@@ -7,7 +7,8 @@ import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { FileDown, FileSpreadsheet, Plus, Pencil, Trash2, ArrowUpDown, ChevronDown, ChevronRight, ListTree } from "lucide-react";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { FileDown, FileSpreadsheet, Plus, Pencil, Trash2, ArrowUpDown, ChevronDown, ChevronRight, ListTree, Maximize2 } from "lucide-react";
 import { exportToPdf, exportToExcel } from "@/utils/exportUtils";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
@@ -100,6 +101,7 @@ export default function ProjetosPage() {
   const [deleting, setDeleting] = useState(false);
   const [expandedProjects, setExpandedProjects] = useState<Set<number>>(new Set());
   const [expandedTasks, setExpandedTasks] = useState<Set<string>>(new Set());
+  const [modalProjectId, setModalProjectId] = useState<number | null>(null);
 
   const taskTreesByProject = useMemo(() => {
     const grouped = new Map<string, ProjectTaskNode[]>();
@@ -152,6 +154,45 @@ export default function ProjetosPage() {
     });
   };
 
+  const collectExpandableTaskIds = (nodes: ProjectTaskNode[]): string[] => {
+    const ids: string[] = [];
+    const visit = (items: ProjectTaskNode[]) => {
+      items.forEach((item) => {
+        if (item.children.length > 0) {
+          ids.push(item.id);
+          visit(item.children);
+        }
+      });
+    };
+    visit(nodes);
+    return ids;
+  };
+
+  const expandAllProjectTasks = (projectName: string) => {
+    const tree = taskTreesByProject.get(projectName) || [];
+    const ids = collectExpandableTaskIds(tree);
+    setExpandedTasks((current) => {
+      const next = new Set(current);
+      ids.forEach((id) => next.add(id));
+      return next;
+    });
+  };
+
+  const collapseAllProjectTasks = (projectName: string) => {
+    const tree = taskTreesByProject.get(projectName) || [];
+    const ids = new Set(collectExpandableTaskIds(tree));
+    setExpandedTasks((current) => {
+      const next = new Set(current);
+      ids.forEach((id) => next.delete(id));
+      return next;
+    });
+  };
+
+  const openProjectModal = (projectId: number, projectName: string) => {
+    expandAllProjectTasks(projectName);
+    setModalProjectId(projectId);
+  };
+
   const handleDelete = async () => {
     if (!deleteTarget) return;
     setDeleting(true);
@@ -187,53 +228,64 @@ export default function ProjetosPage() {
     const hasChildren = task.children.length > 0;
     const isExpanded = expandedTasks.has(task.id);
     const resourceNames = getTaskResourceNames(task);
+    const hierarchy = getTaskDisplayHierarchy(task);
+    const isSummary = hasChildren;
 
     return (
       <div key={task.id} className="space-y-2">
         <div
-          className="rounded-xl border border-border/60 bg-background/40 px-3 py-3"
-          style={{ marginLeft: `${task.depth * 18}px` }}
+          className={`rounded-xl border px-3 py-3 ${isSummary ? "border-primary/20 bg-primary/5" : "border-border/60 bg-background/40"}`}
         >
-          <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-            <div className="min-w-0 flex-1 space-y-2">
-              <div className="flex flex-wrap items-center gap-2">
+          <div className="grid gap-3 lg:grid-cols-[92px_72px_108px_minmax(0,1fr)_220px] lg:items-start">
+            <div className="text-xs font-mono font-semibold text-foreground">
+              {getTaskBusinessId(task) || "—"}
+              <div className="mt-1 text-[10px] text-muted-foreground">EDT {hierarchy || "—"}</div>
+            </div>
+            <div className="text-xs font-semibold text-foreground">{task.percentual}%</div>
+            <div className="text-xs">
+              <StatusBadge status={task.status} />
+            </div>
+            <div className="min-w-0">
+              <div className="flex items-start gap-2" style={{ paddingLeft: `${task.depth * 18}px` }}>
                 {hasChildren ? (
                   <button
                     type="button"
                     onClick={() => toggleTaskNode(task.id)}
-                    className="inline-flex h-6 w-6 items-center justify-center rounded-full border border-border/60 bg-background/80 text-muted-foreground transition-colors hover:bg-muted"
+                    className="mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-sm text-muted-foreground transition-colors hover:bg-muted"
                     title={isExpanded ? "Recolher subtarefas" : "Expandir subtarefas"}
                   >
-                    {isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                    {isExpanded ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
                   </button>
                 ) : (
-                  <span className="inline-flex h-6 w-6 items-center justify-center rounded-full border border-transparent text-muted-foreground/60">
-                    <ListTree size={13} />
+                  <span className="mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center text-muted-foreground/45">
+                    <ListTree size={11} />
                   </span>
                 )}
-                <Badge variant="outline" className="font-mono">{getTaskBusinessId(task) || "sem-id"}</Badge>
-                <Badge variant="outline" className="font-mono">WBS {getTaskDisplayHierarchy(task)}</Badge>
-                <StatusBadge status={task.status} />
-                {hasChildren ? (
-                  <Badge variant="secondary" className="text-[10px]">
-                    {task.children.length} subitem(ns)
-                  </Badge>
-                ) : null}
-              </div>
-              <div className="min-w-0">
-                <p className="text-sm font-medium text-foreground break-words">{task.tarefa}</p>
-                <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
-                  <span><strong className="text-foreground">Responsáveis:</strong> {resourceNames.length ? resourceNames.join(", ") : "—"}</span>
-                  <span><strong className="text-foreground">Prazo:</strong> {task.dataInicioPlanej || "—"} até {task.dataFimPlanej || "—"}</span>
-                  <span><strong className="text-foreground">Conclusão:</strong> {task.percentual}%</span>
+                <div className="min-w-0">
+                  <p className={`break-words text-sm ${isSummary ? "font-semibold uppercase tracking-[0.02em] text-foreground" : "font-medium text-foreground"}`}>
+                    {task.tarefa}
+                  </p>
+                  <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
+                    <span>{task.dataInicioPlanej || "—"} → {task.dataFimPlanej || "—"}</span>
+                    {hasChildren ? (
+                      <Badge variant="secondary" className="text-[10px]">
+                        {task.children.length} subitem(ns)
+                      </Badge>
+                    ) : null}
+                  </div>
                 </div>
               </div>
             </div>
-            <div className="flex min-w-[180px] items-center gap-3 lg:justify-end">
-              <div className="flex-1 lg:max-w-[180px]">
-                <Progress value={task.percentual} className="h-2" />
+            <div className="space-y-2">
+              <div className="text-xs text-muted-foreground">
+                <strong className="text-foreground">Responsáveis:</strong> {resourceNames.length ? resourceNames.join(", ") : "—"}
               </div>
-              <span className="text-xs font-medium text-muted-foreground">{task.percentual}%</span>
+              <div className="flex items-center gap-3">
+                <div className="flex-1">
+                  <Progress value={task.percentual} className="h-2" />
+                </div>
+                <span className="text-[11px] font-medium text-muted-foreground">{task.percentual}%</span>
+              </div>
             </div>
           </div>
         </div>
@@ -246,6 +298,64 @@ export default function ProjetosPage() {
       </div>
     );
   };
+
+  const renderProjectDrilldown = (project: Projeto, mode: "inline" | "modal" = "inline") => {
+    const tree = taskTreesByProject.get(project.projeto) || [];
+    const totalItems = tarefas.filter((task) => task.projeto === project.projeto).length;
+
+    return (
+      <div className={`space-y-3 rounded-2xl border border-border/70 bg-card/50 ${mode === "modal" ? "p-5" : "p-4"}`}>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h4 className="text-sm font-semibold text-foreground">Drilldown do projeto</h4>
+            <p className="text-xs text-muted-foreground">Estrutura hierárquica em todos os níveis, enquanto houver subtarefas.</p>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <Badge variant="outline" className="w-fit">
+              {totalItems} item(ns)
+            </Badge>
+            <Button variant="outline" size="sm" onClick={() => expandAllProjectTasks(project.projeto)}>
+              Expandir tudo
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => collapseAllProjectTasks(project.projeto)}>
+              Recolher
+            </Button>
+            {mode === "inline" ? (
+              <Button
+                variant="outline"
+                size="icon"
+                className="h-8 w-8"
+                title="Expandir drilldown em modal"
+                onClick={() => openProjectModal(project.id, project.projeto)}
+              >
+                <Maximize2 size={14} />
+              </Button>
+            ) : null}
+          </div>
+        </div>
+
+        <div className="grid gap-3 rounded-xl border border-border/60 bg-background/35 px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground lg:grid-cols-[92px_72px_108px_minmax(0,1fr)_220px]">
+          <span>EDT</span>
+          <span>%</span>
+          <span>Status</span>
+          <span>Nome da tarefa</span>
+          <span>Responsáveis</span>
+        </div>
+
+        {tree.length > 0 ? (
+          <div className="space-y-2">
+            {tree.map((task) => renderTaskNode(task))}
+          </div>
+        ) : (
+          <div className="rounded-xl border border-dashed border-border/70 bg-background/40 p-4 text-sm text-muted-foreground">
+            Este projeto ainda não possui tarefas cadastradas para drilldown.
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const modalProject = filtered.find((project) => project.id === modalProjectId) || projetos.find((project) => project.id === modalProjectId) || null;
 
   return (
     <div className="flex flex-col">
@@ -382,26 +492,8 @@ export default function ProjetosPage() {
                 </div>
 
                 {expandedProjects.has(p.id) ? (
-                  <div className="mt-5 space-y-3 rounded-2xl border border-border/70 bg-card/50 p-4">
-                    <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
-                      <div>
-                        <h4 className="text-sm font-semibold text-foreground">Drilldown do projeto</h4>
-                        <p className="text-xs text-muted-foreground">Navegue pelas tarefas e subtarefas vinculadas a este projeto.</p>
-                      </div>
-                      <Badge variant="outline" className="w-fit">
-                        {tarefas.filter((task) => task.projeto === p.projeto).length} item(ns)
-                      </Badge>
-                    </div>
-
-                    {(taskTreesByProject.get(p.projeto) || []).length > 0 ? (
-                      <div className="space-y-3">
-                        {(taskTreesByProject.get(p.projeto) || []).map((task) => renderTaskNode(task))}
-                      </div>
-                    ) : (
-                      <div className="rounded-xl border border-dashed border-border/70 bg-background/40 p-4 text-sm text-muted-foreground">
-                        Este projeto ainda não possui tarefas cadastradas para drilldown.
-                      </div>
-                    )}
+                  <div className="mt-5">
+                    {renderProjectDrilldown(p)}
                   </div>
                 ) : null}
               </CardContent>
@@ -412,6 +504,23 @@ export default function ProjetosPage() {
 
       {canWrite && <ProjetoDialog open={dialogOpen} onOpenChange={setDialogOpen} projeto={editProjeto} />}
       {canWrite && <ProjectTemplateDialog open={templateDialogOpen} onOpenChange={setTemplateDialogOpen} />}
+      <Dialog open={!!modalProject} onOpenChange={(open) => !open && setModalProjectId(null)}>
+        <DialogContent className="flex h-[92vh] max-h-[92vh] w-[95vw] max-w-[95vw] flex-col gap-4 overflow-hidden border-border/90 bg-card p-6 shadow-2xl">
+          {modalProject ? (
+            <>
+              <DialogHeader className="pr-8">
+                <DialogTitle>{modalProject.projeto} · Drilldown hierárquico</DialogTitle>
+                <DialogDescription>
+                  Visualização ampliada da estrutura do projeto, com expansão em todos os níveis de tarefas e subtarefas.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="min-h-0 flex-1 overflow-y-auto pr-2">
+                {renderProjectDrilldown(modalProject, "modal")}
+              </div>
+            </>
+          ) : null}
+        </DialogContent>
+      </Dialog>
       <DeleteDialog
         open={!!deleteTarget}
         onOpenChange={o => !o && setDeleteTarget(null)}
