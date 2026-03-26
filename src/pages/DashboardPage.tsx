@@ -285,15 +285,15 @@ export default function DashboardPage() {
                 <FolderKanban size={16} className="mr-2" />
                 Ver Projetos
               </Button>
-              <Button variant="outline" className="rounded-2xl border-white/8 bg-white/[0.03] px-5" onClick={() => navigate("/tarefas")}>
+              <Button className="rounded-2xl bg-emerald-600 px-5 text-white shadow-[0_18px_30px_-18px_rgba(5,150,105,0.95)] hover:bg-emerald-500" onClick={() => navigate("/tarefas")}>
                 <ListTodo size={16} className="mr-2" />
                 Ver Tarefas
               </Button>
-              <Button variant="outline" className="rounded-2xl border-white/8 bg-white/[0.03] px-5" onClick={() => updateSearchParam("tab", "curva-s")}>
+              <Button className="rounded-2xl bg-violet-600 px-5 text-white shadow-[0_18px_30px_-18px_rgba(124,58,237,0.95)] hover:bg-violet-500" onClick={() => updateSearchParam("tab", "curva-s")}>
                 <GitBranch size={16} className="mr-2" />
                 Curva S
               </Button>
-              <Button variant="outline" className="rounded-2xl border-white/8 bg-white/[0.03] px-5" onClick={() => navigate("/cadastro?tab=projetos")}>
+              <Button className="rounded-2xl bg-fuchsia-600 px-5 text-white shadow-[0_18px_30px_-18px_rgba(192,38,211,0.95)] hover:bg-fuchsia-500" onClick={() => navigate("/cadastro?tab=projetos")}>
                 <Plus size={16} className="mr-2" />
                 Cadastros
               </Button>

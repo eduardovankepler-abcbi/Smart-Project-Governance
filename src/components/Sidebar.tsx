@@ -1,4 +1,5 @@
-import { NavLink } from "react-router-dom";
+import { useEffect, useMemo, useState } from "react";
+import { NavLink, useLocation } from "react-router-dom";
 import {
   LayoutDashboard,
   FolderKanban,
@@ -15,6 +16,8 @@ import {
   Boxes,
   Building2,
   MessageSquare,
+  ChevronDown,
+  ChevronRight,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import logo from "@/assets/logo_abc.png";
@@ -140,6 +143,8 @@ function MiniNavItem({ to, icon: Icon, label }: { to: string; icon: LucideIcon; 
 
 export default function Sidebar() {
   const { user } = useAuth();
+  const location = useLocation();
+  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
   const visibleSections = sections
     .map((section) => ({
       ...section,
@@ -151,6 +156,36 @@ export default function Sidebar() {
         })),
     }))
     .filter((section) => section.items.length > 0);
+
+  const activeGroupKeys = useMemo(() => {
+    const keys: string[] = [];
+    visibleSections.forEach((section) => {
+      section.items.forEach((item) => {
+        if (item.subItems?.some((subItem) => {
+          const [path, query = ""] = subItem.to.split("?");
+          if (location.pathname !== path) return false;
+          return !query || location.search.includes(query);
+        })) {
+          keys.push(item.to);
+        }
+      });
+    });
+    return keys;
+  }, [location.pathname, location.search, visibleSections]);
+
+  useEffect(() => {
+    setOpenGroups((current) => {
+      const next = { ...current };
+      activeGroupKeys.forEach((key) => {
+        if (next[key] === undefined) next[key] = true;
+      });
+      return next;
+    });
+  }, [activeGroupKeys]);
+
+  const toggleGroup = (key: string) => {
+    setOpenGroups((current) => ({ ...current, [key]: !current[key] }));
+  };
 
   return (
     <aside className="fixed left-0 top-0 z-40 flex h-screen w-72 flex-col overflow-hidden border-r border-sidebar-border bg-sidebar text-sidebar-foreground">
@@ -174,28 +209,42 @@ export default function Sidebar() {
               <div className="space-y-1">
                 {section.items.map(({ to, label, icon: Icon, subItems }) => (
                   <div key={to} className="space-y-1.5">
-                    <NavLink
-                      to={to}
-                      end={to === "/"}
-                      className={({ isActive }) =>
-                        `group flex items-center gap-3 rounded-[18px] px-4 py-3 text-sm font-medium transition-all ${
-                          isActive
-                            ? "bg-gradient-to-r from-blue-500 to-blue-400 text-sidebar-primary-foreground shadow-[0_18px_30px_-18px_rgba(59,130,246,0.95)]"
-                            : "text-sidebar-foreground/72 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-                        }`
-                      }
-                    >
-                      <span className="flex h-9 w-9 items-center justify-center rounded-2xl bg-white/6 transition-colors group-hover:bg-white/10">
-                        <Icon size={17} />
-                      </span>
-                      <span className="min-w-0 flex-1 truncate text-[15px]">{label}</span>
-                    </NavLink>
+                    <div className="flex items-stretch gap-2">
+                      <NavLink
+                        to={to}
+                        end={to === "/"}
+                        className={({ isActive }) =>
+                          `group flex flex-1 items-center gap-3 rounded-[18px] px-4 py-3 text-sm font-medium transition-all ${
+                            isActive
+                              ? "bg-gradient-to-r from-blue-500 to-blue-400 text-sidebar-primary-foreground shadow-[0_18px_30px_-18px_rgba(59,130,246,0.95)]"
+                              : "text-sidebar-foreground/72 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                          }`
+                        }
+                      >
+                        <span className="flex h-9 w-9 items-center justify-center rounded-2xl bg-white/6 transition-colors group-hover:bg-white/10">
+                          <Icon size={17} />
+                        </span>
+                        <span className="min-w-0 flex-1 truncate text-[15px]">{label}</span>
+                      </NavLink>
+                      {subItems.length ? (
+                        <button
+                          type="button"
+                          onClick={() => toggleGroup(to)}
+                          className="flex h-[54px] w-[46px] items-center justify-center rounded-[18px] border border-white/6 bg-white/[0.03] text-sidebar-foreground/62 transition-colors hover:bg-white/[0.06] hover:text-sidebar-foreground"
+                          title={openGroups[to] ? "Recolher submenu" : "Expandir submenu"}
+                        >
+                          {openGroups[to] ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+                        </button>
+                      ) : null}
+                    </div>
 
-                    {subItems.length ? (
-                      <div className="ml-12 space-y-1">
+                    {subItems.length && openGroups[to] ? (
+                      <div className="ml-12 rounded-2xl border border-white/6 bg-white/[0.025] p-2">
+                        <div className="space-y-1">
                         {subItems.map((subItem) => (
                           <MiniNavItem key={`${to}-${subItem.label}`} to={subItem.to} icon={subItem.icon} label={subItem.label} />
                         ))}
+                        </div>
                       </div>
                     ) : null}
                   </div>
