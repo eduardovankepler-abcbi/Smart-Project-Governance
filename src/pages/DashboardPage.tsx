@@ -1,15 +1,17 @@
 import { useMemo } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import Header from "@/components/Header";
 import { useData, formatCurrency } from "@/contexts/DataContext";
 import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend, LineChart, Line } from "recharts";
-import { TrendingUp, AlertTriangle, CheckCircle, Clock, DollarSign, FolderKanban } from "lucide-react";
+import { TrendingUp, AlertTriangle, CheckCircle, Clock, DollarSign, FolderKanban, GitBranch, ListTodo, Plus, ArrowUpRight, Gauge } from "lucide-react";
 import { getTaskResourceNames } from "@/utils/projectModel";
 import BaselineGovernancePanel from "@/components/BaselineGovernancePanel";
 import ChartPreviewModal from "@/components/ChartPreviewModal";
+import { useAuth } from "@/contexts/AuthContext";
 
 const COLORS = [
   "hsl(0, 78%, 45%)",
@@ -33,6 +35,8 @@ function parseDate(dateStr: string): Date | null {
 
 export default function DashboardPage() {
   const { projetos, tarefas, getUniqueProjetos } = useData();
+  const { user } = useAuth();
+  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const filterProjeto = searchParams.get("projeto") || "all";
   const activeTab = searchParams.get("tab") === "curva-s" ? "curva-s" : "resumo";
@@ -125,12 +129,54 @@ export default function DashboardPage() {
   const execucao = valorPrevisto > 0 ? Math.round((valorGasto / valorPrevisto) * 100) : 0;
 
   const kpis = [
-    { label: "Projetos", value: totalProjetos, icon: FolderKanban, color: "text-info" },
-    { label: "Total de Tarefas", value: totalTarefas, icon: Clock, color: "text-muted-foreground" },
-    { label: "Tarefas Atrasadas", value: totalAtrasadas, icon: AlertTriangle, color: "text-destructive" },
-    { label: "Valor Previsto", value: formatCurrency(valorPrevisto), icon: DollarSign, color: "text-success" },
-    { label: "Valor Gasto", value: formatCurrency(valorGasto), icon: TrendingUp, color: "text-warning" },
-    { label: "Execução Financeira", value: `${execucao}%`, icon: CheckCircle, color: "text-primary" },
+    {
+      label: "Projetos Ativos",
+      value: totalProjetos,
+      icon: FolderKanban,
+      color: "text-info",
+      detailA: `${filteredProjetos.filter((item) => item.status === "Atrasado").length} atrasados`,
+      detailB: `${filteredProjetos.filter((item) => item.status === "Concluído").length} concluídos`,
+    },
+    {
+      label: "Tarefas Totais",
+      value: totalTarefas,
+      icon: Clock,
+      color: "text-warning",
+      detailA: `${filteredTarefas.filter((item) => item.status === "Em andamento").length} em andamento`,
+      detailB: `${filteredTarefas.filter((item) => item.status === "Não iniciado").length} não iniciadas`,
+    },
+    {
+      label: "Atrasos Críticos",
+      value: totalAtrasadas,
+      icon: AlertTriangle,
+      color: "text-destructive",
+      detailA: `${filteredProjetos.length ? Math.round((totalAtrasadas / Math.max(totalTarefas, 1)) * 100) : 0}% do total`,
+      detailB: `${filterProjeto === "all" ? "Portfólio" : "Projeto"} monitorado`,
+    },
+    {
+      label: "Horas Planejadas",
+      value: `${filteredTarefas.reduce((sum, item) => sum + Number(item.esforcoPlanej || 0), 0).toFixed(0)}h`,
+      icon: Gauge,
+      color: "text-success",
+      detailA: `${filteredTarefas.reduce((sum, item) => sum + Number(item.esforcoReal || 0), 0).toFixed(0)}h realizadas`,
+      detailB: `${execucao}% execução`,
+    },
+    {
+      label: "Valor Previsto",
+      value: formatCurrency(valorPrevisto),
+      icon: DollarSign,
+      color: "text-info",
+      detailA: formatCurrency(valorGasto),
+      detailB: "valor gasto",
+    },
+    {
+      label: "Saúde Financeira",
+      value: `${execucao}%`,
+      icon: CheckCircle,
+      color: "text-chart-3",
+      detailA: totalProjetos ? `${Math.max(totalProjetos - filteredProjetos.filter((item) => item.status === "Atrasado").length, 0)} dentro do plano` : "Sem base",
+      detailB: "comparação previsto x gasto",
+    },
   ];
 
   const tooltipStyle = { background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: "8px", color: "hsl(var(--foreground))" };
@@ -221,55 +267,91 @@ export default function DashboardPage() {
     <div className="flex flex-col">
       <Header title="Dashboard" />
       <div className="space-y-6 px-5 pb-6 animate-fade-in">
-        <div className="surface-panel flex flex-col gap-4 px-5 py-5 lg:flex-row lg:items-end lg:justify-between">
-          <div className="max-w-2xl space-y-2">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-muted-foreground">Visão Executiva</p>
-            <h2 className="text-2xl font-display font-semibold text-foreground">Panorama consolidado do portfólio</h2>
-            <p className="text-sm text-muted-foreground">
-              Acompanhe execução, capacidade e saúde financeira em um layout mais limpo, mantendo a mesma densidade operacional.
-            </p>
+        <div className="surface-panel overflow-hidden px-6 py-6">
+          <div className="flex flex-col gap-6 xl:flex-row xl:items-start xl:justify-between">
+            <div className="max-w-3xl space-y-3">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-muted-foreground">Dashboard Executivo</p>
+              <div className="space-y-2">
+                <h2 className="text-4xl font-display font-bold tracking-tight text-foreground">
+                  Olá, {user?.nome?.split(" ")[0] || "Equipe"}!
+                </h2>
+                <p className="max-w-2xl text-lg text-muted-foreground">
+                  Aqui está o resumo estratégico da operação. Acompanhe portfólio, tarefas, finanças e a governança do cronograma em uma única camada visual.
+                </p>
+              </div>
+            </div>
+            <div className="flex flex-wrap gap-3 xl:justify-end">
+              <Button className="rounded-2xl bg-primary px-5 shadow-[0_18px_30px_-18px_rgba(59,130,246,0.95)]" onClick={() => navigate("/projetos")}>
+                <FolderKanban size={16} className="mr-2" />
+                Ver Projetos
+              </Button>
+              <Button variant="outline" className="rounded-2xl border-white/8 bg-white/[0.03] px-5" onClick={() => navigate("/tarefas")}>
+                <ListTodo size={16} className="mr-2" />
+                Ver Tarefas
+              </Button>
+              <Button variant="outline" className="rounded-2xl border-white/8 bg-white/[0.03] px-5" onClick={() => updateSearchParam("tab", "curva-s")}>
+                <GitBranch size={16} className="mr-2" />
+                Curva S
+              </Button>
+              <Button variant="outline" className="rounded-2xl border-white/8 bg-white/[0.03] px-5" onClick={() => navigate("/cadastro?tab=projetos")}>
+                <Plus size={16} className="mr-2" />
+                Cadastros
+              </Button>
+            </div>
           </div>
-          <div className="flex flex-wrap gap-3">
-            <Select value={filterProjeto} onValueChange={(value) => updateSearchParam("projeto", value)}>
-              <SelectTrigger className="w-60 rounded-xl border-border/80 bg-background/80">
-                <SelectValue placeholder="Projeto" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos os Projetos</SelectItem>
-                {projetosUnicos.map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
 
-        <Tabs value={activeTab} onValueChange={(value) => updateSearchParam("tab", value)} className="space-y-6">
-          <TabsList className="grid w-full max-w-md grid-cols-2">
-            <TabsTrigger value="resumo">Resumo</TabsTrigger>
-            <TabsTrigger value="curva-s">Curva S</TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="resumo" className="space-y-6">
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-              {kpis.map(({ label, value, icon: Icon, color }) => (
-                <Card key={label} className="border-border/80 bg-card/90 shadow-[0_18px_40px_-32px_rgba(15,23,42,0.45)]">
-                  <CardContent className="flex flex-col gap-3 p-4">
-                    <div className="flex items-center gap-3">
-                      <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-muted/55">
-                        <Icon size={16} className={color} />
+          <div className="mt-6 flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+            <div className="grid flex-1 grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-6">
+              {kpis.map(({ label, value, icon: Icon, color, detailA, detailB }) => (
+                <Card key={label} className="border-white/6 bg-white/[0.02] shadow-none">
+                  <CardContent className="space-y-4 p-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="space-y-1">
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">{label}</p>
+                        <p className="text-3xl font-display font-bold text-foreground">{value}</p>
+                      </div>
+                      <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white/[0.04]">
+                        <Icon size={18} className={color} />
                       </span>
-                      <span className="text-xs font-medium text-muted-foreground">{label}</span>
                     </div>
-                    <p className="text-xl font-display font-bold text-foreground">{value}</p>
+                    <div className="grid grid-cols-2 gap-3 border-t border-white/6 pt-3 text-xs text-muted-foreground">
+                      <div>{detailA}</div>
+                      <div>{detailB}</div>
+                    </div>
                   </CardContent>
                 </Card>
               ))}
             </div>
 
+            <div className="flex flex-wrap gap-3">
+              <Select value={filterProjeto} onValueChange={(value) => updateSearchParam("projeto", value)}>
+                <SelectTrigger className="w-60 rounded-2xl border-white/8 bg-white/[0.03]">
+                  <SelectValue placeholder="Projeto" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos os Projetos</SelectItem>
+                  {projetosUnicos.map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        </div>
+
+        <Tabs value={activeTab} onValueChange={(value) => updateSearchParam("tab", value)} className="space-y-6">
+          <TabsList className="grid w-full max-w-lg grid-cols-2 rounded-[22px] border border-white/6 bg-card/85 p-1.5">
+            <TabsTrigger value="resumo" className="rounded-2xl data-[state=active]:bg-background data-[state=active]:shadow-none">Resumo</TabsTrigger>
+            <TabsTrigger value="curva-s" className="rounded-2xl data-[state=active]:bg-background data-[state=active]:shadow-none">Curva S</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="resumo" className="space-y-6">
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               <Card className="border-border/80 bg-card/92 shadow-[0_18px_40px_-32px_rgba(15,23,42,0.42)]">
                 <CardContent className="p-5">
                   <div className="mb-4 flex items-start justify-between gap-3">
-                    <h3 className="text-sm font-display font-semibold text-foreground">Status dos Projetos</h3>
+                    <div className="space-y-1">
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">Portfólio</p>
+                      <h3 className="text-lg font-display font-semibold text-foreground">Status dos Projetos</h3>
+                    </div>
                     <ChartPreviewModal
                       title="Status dos Projetos"
                       description="Distribuição dos projetos por status no filtro atual."
@@ -283,7 +365,10 @@ export default function DashboardPage() {
               <Card className="border-border/80 bg-card/92 shadow-[0_18px_40px_-32px_rgba(15,23,42,0.42)]">
                 <CardContent className="p-5">
                   <div className="mb-4 flex items-start justify-between gap-3">
-                    <h3 className="text-sm font-display font-semibold text-foreground">Distribuição de Tarefas por Status</h3>
+                    <div className="space-y-1">
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">Execução</p>
+                      <h3 className="text-lg font-display font-semibold text-foreground">Tarefas por Status</h3>
+                    </div>
                     <ChartPreviewModal
                       title="Distribuição de Tarefas por Status"
                       description="Visão agregada do status das tarefas no filtro atual."
@@ -297,7 +382,10 @@ export default function DashboardPage() {
               <Card className="border-border/80 bg-card/92 shadow-[0_18px_40px_-32px_rgba(15,23,42,0.42)]">
                 <CardContent className="p-5">
                   <div className="mb-4 flex items-start justify-between gap-3">
-                    <h3 className="text-sm font-display font-semibold text-foreground">Curva de Burndown</h3>
+                    <div className="space-y-1">
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">Entrega</p>
+                      <h3 className="text-lg font-display font-semibold text-foreground">Curva de Burndown</h3>
+                    </div>
                     <ChartPreviewModal
                       title="Curva de Burndown"
                       description="Evolução das tarefas restantes ao longo do cronograma planejado."
@@ -312,7 +400,10 @@ export default function DashboardPage() {
             <Card className="border-border/80 bg-card/92 shadow-[0_18px_40px_-32px_rgba(15,23,42,0.42)]">
               <CardContent className="p-5">
                 <div className="mb-4 flex items-start justify-between gap-3">
-                  <h3 className="text-sm font-display font-semibold text-foreground">Tarefas por Responsável (10 maiores)</h3>
+                  <div className="space-y-1">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">Performance</p>
+                    <h3 className="text-lg font-display font-semibold text-foreground">Produtividade por Responsável</h3>
+                  </div>
                   <ChartPreviewModal
                     title="Tarefas por Responsável"
                     description="Ranking dos responsáveis com maior volume de tarefas no recorte atual."
@@ -326,7 +417,10 @@ export default function DashboardPage() {
             <Card className="border-border/80 bg-card/92 shadow-[0_18px_40px_-32px_rgba(15,23,42,0.42)]">
               <CardContent className="p-5">
                 <div className="mb-4 flex items-start justify-between gap-3">
-                  <h3 className="text-sm font-display font-semibold text-foreground">Tarefas por Projeto</h3>
+                  <div className="space-y-1">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">Portfólio</p>
+                    <h3 className="text-lg font-display font-semibold text-foreground">Tarefas por Projeto</h3>
+                  </div>
                   <ChartPreviewModal
                     title="Tarefas por Projeto"
                     description="Comparativo de tarefas atrasadas, em andamento e concluídas por projeto."
@@ -340,7 +434,10 @@ export default function DashboardPage() {
             <Card className="border-border/80 bg-card/92 shadow-[0_18px_40px_-32px_rgba(15,23,42,0.42)]">
               <CardContent className="p-5">
                 <div className="mb-4 flex items-start justify-between gap-3">
-                  <h3 className="text-sm font-display font-semibold text-foreground">Comparativo Financeiro por Projeto</h3>
+                  <div className="space-y-1">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">Financeiro</p>
+                    <h3 className="text-lg font-display font-semibold text-foreground">Comparativo Financeiro</h3>
+                  </div>
                   <ChartPreviewModal
                     title="Comparativo Financeiro por Projeto"
                     description="Comparação entre valor previsto e valor gasto por projeto."
