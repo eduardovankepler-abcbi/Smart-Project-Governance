@@ -300,15 +300,15 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          <div className="mt-6 space-y-4">
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6">
+          <div className="mt-6 space-y-5">
+            <div className="grid gap-4 [grid-template-columns:repeat(auto-fit,minmax(220px,1fr))]">
               {kpis.map(({ label, value, icon: Icon, color, detailA, detailB }) => (
                 <Card key={label} className="min-w-0 border-white/[0.06] bg-white/[0.02] shadow-none">
                   <CardContent className="space-y-4 p-4">
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0 space-y-1">
-                        <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">{label}</p>
-                        <p className="break-words text-[clamp(1.9rem,2.2vw,3rem)] font-display font-bold leading-none text-foreground">
+                        <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">{label}</p>
+                        <p className="break-words text-[clamp(1.7rem,2vw,2.5rem)] font-display font-bold leading-[0.95] text-foreground">
                           {value}
                         </p>
                       </div>
@@ -316,7 +316,7 @@ export default function DashboardPage() {
                         <Icon size={18} className={color} />
                       </span>
                     </div>
-                    <div className="grid grid-cols-1 gap-2 border-t border-white/[0.06] pt-3 text-xs leading-relaxed text-muted-foreground sm:grid-cols-2">
+                    <div className="space-y-2 border-t border-white/[0.06] pt-3 text-xs leading-relaxed text-muted-foreground">
                       <div className="min-w-0 break-words">{detailA}</div>
                       <div className="min-w-0 break-words">{detailB}</div>
                     </div>
