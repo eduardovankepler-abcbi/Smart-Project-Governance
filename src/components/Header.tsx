@@ -25,7 +25,7 @@ export default function Header({ title }: { title: string }) {
 
   return (
     <>
-      <header className="sticky top-0 z-30 -mx-6 mb-6 border-b border-white/6 bg-background/88 px-6 py-4 backdrop-blur-xl">
+      <header className="sticky top-0 z-30 -mx-6 mb-6 border-b border-white/[0.06] bg-background/[0.88] px-6 py-4 backdrop-blur-xl">
         <div className="flex min-h-14 items-center justify-between gap-4">
           <div className="space-y-1">
             <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-muted-foreground">Smart Project</p>
@@ -36,16 +36,16 @@ export default function Header({ title }: { title: string }) {
             {canImport ? <ExcelImport /> : null}
             <NotificationBell />
 
-            <Button variant="ghost" size="icon" onClick={toggleTheme} className="h-10 w-10 rounded-2xl border border-white/6 bg-white/[0.03]">
+            <Button variant="ghost" size="icon" onClick={toggleTheme} className="h-10 w-10 rounded-2xl border border-white/[0.06] bg-white/[0.03]">
               {theme === "light" ? <Moon size={18} /> : <Sun size={18} />}
             </Button>
 
-            <Button variant="ghost" size="sm" onClick={() => setPasswordDialogOpen(true)} className="rounded-2xl border border-white/6 bg-white/[0.03] px-3 text-muted-foreground hover:text-foreground">
+            <Button variant="ghost" size="sm" onClick={() => setPasswordDialogOpen(true)} className="rounded-2xl border border-white/[0.06] bg-white/[0.03] px-3 text-muted-foreground hover:text-foreground">
               <KeyRound size={15} className="mr-2" />
               Senha
             </Button>
 
-            <Button variant="ghost" size="sm" onClick={() => void logout()} className="rounded-2xl border border-white/6 bg-white/[0.03] px-3 text-muted-foreground hover:text-foreground">
+            <Button variant="ghost" size="sm" onClick={() => void logout()} className="rounded-2xl border border-white/[0.06] bg-white/[0.03] px-3 text-muted-foreground hover:text-foreground">
               <LogOut size={15} className="mr-2" />
               Sair
             </Button>

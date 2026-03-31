@@ -119,7 +119,7 @@ function MiniNavItem({ to, icon: Icon, label }: { to: string; icon: LucideIcon; 
         `group flex items-center gap-2 rounded-xl px-2.5 py-2 text-xs transition-all ${
           isActive
             ? "bg-white/10 text-sidebar-primary-foreground"
-            : "text-sidebar-foreground/58 hover:bg-white/[0.04] hover:text-sidebar-foreground/88"
+            : "text-sidebar-foreground/[0.58] hover:bg-white/[0.04] hover:text-sidebar-foreground/[0.88]"
         }`
       }
     >
@@ -128,8 +128,8 @@ function MiniNavItem({ to, icon: Icon, label }: { to: string; icon: LucideIcon; 
           <span
             className={`flex h-6 w-6 items-center justify-center rounded-lg border ${
               isActive
-                ? "border-white/18 bg-white/10 text-sidebar-primary-foreground"
-                : "border-white/8 bg-white/[0.03]"
+                ? "border-white/[0.18] bg-white/10 text-sidebar-primary-foreground"
+                : "border-white/[0.08] bg-white/[0.03]"
             }`}
           >
             <Icon size={12} />
@@ -195,7 +195,7 @@ export default function Sidebar() {
         </div>
         <div className="pt-4 text-center">
           <p className="font-display text-[1.05rem] font-semibold tracking-tight text-sidebar-foreground">Smart Project</p>
-          <p className="mt-1 text-xs uppercase tracking-[0.26em] text-sidebar-foreground/42">Governance Suite</p>
+          <p className="mt-1 text-xs uppercase tracking-[0.26em] text-sidebar-foreground/[0.42]">Governance Suite</p>
         </div>
       </div>
 
@@ -203,7 +203,7 @@ export default function Sidebar() {
         <div className="space-y-6 pb-4">
           {visibleSections.map((section) => (
             <div key={section.heading} className="space-y-2.5">
-              <p className="px-2 text-[11px] font-semibold uppercase tracking-[0.24em] text-sidebar-foreground/42">
+              <p className="px-2 text-[11px] font-semibold uppercase tracking-[0.24em] text-sidebar-foreground/[0.42]">
                 {section.heading}
               </p>
               <div className="space-y-1">
@@ -217,11 +217,11 @@ export default function Sidebar() {
                           `group flex flex-1 items-center gap-3 rounded-[18px] px-4 py-3 text-sm font-medium transition-all ${
                             isActive
                               ? "bg-gradient-to-r from-blue-500 to-blue-400 text-sidebar-primary-foreground shadow-[0_18px_30px_-18px_rgba(59,130,246,0.95)]"
-                              : "text-sidebar-foreground/72 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                              : "text-sidebar-foreground/[0.72] hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
                           }`
                         }
                       >
-                        <span className="flex h-9 w-9 items-center justify-center rounded-2xl bg-white/6 transition-colors group-hover:bg-white/10">
+                        <span className="flex h-9 w-9 items-center justify-center rounded-2xl bg-white/[0.06] transition-colors group-hover:bg-white/10">
                           <Icon size={17} />
                         </span>
                         <span className="min-w-0 flex-1 truncate text-[15px]">{label}</span>
@@ -230,7 +230,7 @@ export default function Sidebar() {
                         <button
                           type="button"
                           onClick={() => toggleGroup(to)}
-                          className="flex h-[54px] w-[46px] items-center justify-center rounded-[18px] border border-white/6 bg-white/[0.03] text-sidebar-foreground/62 transition-colors hover:bg-white/[0.06] hover:text-sidebar-foreground"
+                          className="flex h-[54px] w-[46px] items-center justify-center rounded-[18px] border border-white/[0.06] bg-white/[0.03] text-sidebar-foreground/[0.62] transition-colors hover:bg-white/[0.06] hover:text-sidebar-foreground"
                           title={openGroups[to] ? "Recolher submenu" : "Expandir submenu"}
                         >
                           {openGroups[to] ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
@@ -239,7 +239,7 @@ export default function Sidebar() {
                     </div>
 
                     {subItems.length && openGroups[to] ? (
-                      <div className="ml-12 rounded-2xl border border-white/6 bg-white/[0.025] p-2">
+                      <div className="ml-12 rounded-2xl border border-white/[0.06] bg-white/[0.025] p-2">
                         <div className="space-y-1">
                         {subItems.map((subItem) => (
                           <MiniNavItem key={`${to}-${subItem.label}`} to={subItem.to} icon={subItem.icon} label={subItem.label} />
@@ -256,13 +256,13 @@ export default function Sidebar() {
       </nav>
 
       <div className="border-t border-sidebar-border px-5 py-4">
-        <div className="rounded-[22px] border border-white/8 bg-white/[0.03] px-4 py-3.5">
+        <div className="rounded-[22px] border border-white/[0.08] bg-white/[0.03] px-4 py-3.5">
           <p className="text-sm font-medium text-sidebar-foreground">{user?.nome ?? "Usuário"}</p>
-          <p className="mt-1 text-[11px] uppercase tracking-[0.24em] text-sidebar-foreground/42">
+          <p className="mt-1 text-[11px] uppercase tracking-[0.24em] text-sidebar-foreground/[0.42]">
             {user?.roleLabel ?? "Acesso"}
           </p>
         </div>
-        <p className="mt-3 px-1 text-xs text-sidebar-foreground/38">Grupo ABC © 2026</p>
+        <p className="mt-3 px-1 text-xs text-sidebar-foreground/[0.38]">Grupo ABC © 2026</p>
       </div>
     </aside>
   );

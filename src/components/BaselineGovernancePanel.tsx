@@ -183,7 +183,7 @@ export default function BaselineGovernancePanel({ selectedProject }: BaselineGov
 
   if (!selectedProject) {
     return (
-      <Card className="border-border/80 bg-card/92 shadow-[0_18px_40px_-32px_rgba(15,23,42,0.42)]">
+      <Card className="border-border/80 bg-card/[0.92] shadow-[0_18px_40px_-32px_rgba(15,23,42,0.42)]">
         <CardContent className="p-5 text-sm text-muted-foreground">
           Selecione um projeto específico para gerenciar baselines, aprovações e visualizar a curva S semanal.
         </CardContent>
@@ -215,7 +215,7 @@ export default function BaselineGovernancePanel({ selectedProject }: BaselineGov
 
   return (
     <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1.1fr_1.4fr]">
-      <Card className="border-border/80 bg-card/92 shadow-[0_18px_40px_-32px_rgba(15,23,42,0.42)]">
+      <Card className="border-border/80 bg-card/[0.92] shadow-[0_18px_40px_-32px_rgba(15,23,42,0.42)]">
         <CardContent className="space-y-5 p-5">
           <div className="flex items-start justify-between gap-4">
             <div className="space-y-1">
@@ -231,7 +231,7 @@ export default function BaselineGovernancePanel({ selectedProject }: BaselineGov
           </div>
 
           <div className="grid gap-3 md:grid-cols-2">
-            <div className="min-w-0 rounded-xl border border-border/70 bg-background/60 p-4">
+            <div className="min-w-0 rounded-xl border border-border/70 bg-background/[0.60] p-4">
               <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Projeto</p>
               <p className="mt-2 text-sm font-medium leading-6 text-foreground break-words [overflow-wrap:anywhere]">
                 {selectedProject.projeto}
@@ -240,7 +240,7 @@ export default function BaselineGovernancePanel({ selectedProject }: BaselineGov
                 {selectedProject.projectId || "Sem código"}
               </p>
             </div>
-            <div className="rounded-xl border border-border/70 bg-background/60 p-4">
+            <div className="rounded-xl border border-border/70 bg-background/[0.60] p-4">
               <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Baselines</p>
               <p className="mt-2 text-sm font-medium text-foreground">{loadingBaselines ? "Carregando..." : `${baselines.length} registradas`}</p>
               <p className="mt-1 text-xs text-muted-foreground">{pendingBaselines.length} pendentes de aprovação</p>
@@ -248,7 +248,7 @@ export default function BaselineGovernancePanel({ selectedProject }: BaselineGov
           </div>
 
           {canWrite ? (
-            <div className="space-y-3 rounded-2xl border border-border/70 bg-background/60 p-4">
+            <div className="space-y-3 rounded-2xl border border-border/70 bg-background/[0.60] p-4">
               <div className="flex items-center gap-2">
                 <ShieldCheck size={16} className="text-primary" />
                 <h4 className="text-sm font-medium text-foreground">Criar nova baseline</h4>
@@ -332,7 +332,7 @@ export default function BaselineGovernancePanel({ selectedProject }: BaselineGov
         </CardContent>
       </Card>
 
-      <Card className="border-border/80 bg-card/92 shadow-[0_18px_40px_-32px_rgba(15,23,42,0.42)]">
+      <Card className="border-border/80 bg-card/[0.92] shadow-[0_18px_40px_-32px_rgba(15,23,42,0.42)]">
         <CardContent className="space-y-5 p-5">
           <div className="space-y-4">
             <div className="flex items-start justify-between gap-4">
@@ -375,16 +375,16 @@ export default function BaselineGovernancePanel({ selectedProject }: BaselineGov
 
           {curveData?.baseline ? (
             <div className="grid gap-3 md:grid-cols-3">
-              <div className="rounded-xl border border-border/70 bg-background/60 p-4">
+              <div className="rounded-xl border border-border/70 bg-background/[0.60] p-4">
                 <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Baseline em comparação</p>
                 <p className="mt-2 text-sm font-medium text-foreground">{curveData.baseline.baselineName}</p>
                 <p className="mt-1 text-xs text-muted-foreground">{curveData.baseline.isOfficial ? "Oficial" : "Histórica"} · {curveData.baseline.status}</p>
               </div>
-              <div className="rounded-xl border border-border/70 bg-background/60 p-4">
+              <div className="rounded-xl border border-border/70 bg-background/[0.60] p-4">
                 <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Planejado acumulado</p>
                 <p className="mt-2 text-sm font-medium text-foreground">{formatMetricValue(curveMetric, curveData.summary.plannedTotal)}</p>
               </div>
-              <div className="rounded-xl border border-border/70 bg-background/60 p-4">
+              <div className="rounded-xl border border-border/70 bg-background/[0.60] p-4">
                 <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Desvio acumulado</p>
                 <p className={`mt-2 text-sm font-medium ${curveData.summary.varianceTotal >= 0 ? "text-success" : "text-destructive"}`}>
                   {formatMetricValue(curveMetric, curveData.summary.varianceTotal)}

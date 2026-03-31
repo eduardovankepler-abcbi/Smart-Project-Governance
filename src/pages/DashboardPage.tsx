@@ -303,7 +303,7 @@ export default function DashboardPage() {
           <div className="mt-6 flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
             <div className="grid flex-1 grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-6">
               {kpis.map(({ label, value, icon: Icon, color, detailA, detailB }) => (
-                <Card key={label} className="border-white/6 bg-white/[0.02] shadow-none">
+                <Card key={label} className="border-white/[0.06] bg-white/[0.02] shadow-none">
                   <CardContent className="space-y-4 p-4">
                     <div className="flex items-start justify-between gap-3">
                       <div className="space-y-1">
@@ -314,7 +314,7 @@ export default function DashboardPage() {
                         <Icon size={18} className={color} />
                       </span>
                     </div>
-                    <div className="grid grid-cols-2 gap-3 border-t border-white/6 pt-3 text-xs text-muted-foreground">
+                    <div className="grid grid-cols-2 gap-3 border-t border-white/[0.06] pt-3 text-xs text-muted-foreground">
                       <div>{detailA}</div>
                       <div>{detailB}</div>
                     </div>
@@ -325,7 +325,7 @@ export default function DashboardPage() {
 
             <div className="flex flex-wrap gap-3">
               <Select value={filterProjeto} onValueChange={(value) => updateSearchParam("projeto", value)}>
-                <SelectTrigger className="w-60 rounded-2xl border-white/8 bg-white/[0.03]">
+                <SelectTrigger className="w-60 rounded-2xl border-white/[0.08] bg-white/[0.03]">
                   <SelectValue placeholder="Projeto" />
                 </SelectTrigger>
                 <SelectContent>
@@ -338,14 +338,14 @@ export default function DashboardPage() {
         </div>
 
         <Tabs value={activeTab} onValueChange={(value) => updateSearchParam("tab", value)} className="space-y-6">
-          <TabsList className="grid w-full max-w-lg grid-cols-2 rounded-[22px] border border-white/6 bg-card/85 p-1.5">
+          <TabsList className="grid w-full max-w-lg grid-cols-2 rounded-[22px] border border-white/[0.06] bg-card/[0.85] p-1.5">
             <TabsTrigger value="resumo" className="rounded-2xl data-[state=active]:bg-background data-[state=active]:shadow-none">Resumo</TabsTrigger>
             <TabsTrigger value="curva-s" className="rounded-2xl data-[state=active]:bg-background data-[state=active]:shadow-none">Curva S</TabsTrigger>
           </TabsList>
 
           <TabsContent value="resumo" className="space-y-6">
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              <Card className="border-border/80 bg-card/92 shadow-[0_18px_40px_-32px_rgba(15,23,42,0.42)]">
+              <Card className="border-border/80 bg-card/[0.92] shadow-[0_18px_40px_-32px_rgba(15,23,42,0.42)]">
                 <CardContent className="p-5">
                   <div className="mb-4 flex items-start justify-between gap-3">
                     <div className="space-y-1">
@@ -362,7 +362,7 @@ export default function DashboardPage() {
                 </CardContent>
               </Card>
 
-              <Card className="border-border/80 bg-card/92 shadow-[0_18px_40px_-32px_rgba(15,23,42,0.42)]">
+              <Card className="border-border/80 bg-card/[0.92] shadow-[0_18px_40px_-32px_rgba(15,23,42,0.42)]">
                 <CardContent className="p-5">
                   <div className="mb-4 flex items-start justify-between gap-3">
                     <div className="space-y-1">
@@ -379,7 +379,7 @@ export default function DashboardPage() {
                 </CardContent>
               </Card>
 
-              <Card className="border-border/80 bg-card/92 shadow-[0_18px_40px_-32px_rgba(15,23,42,0.42)]">
+              <Card className="border-border/80 bg-card/[0.92] shadow-[0_18px_40px_-32px_rgba(15,23,42,0.42)]">
                 <CardContent className="p-5">
                   <div className="mb-4 flex items-start justify-between gap-3">
                     <div className="space-y-1">
@@ -397,7 +397,7 @@ export default function DashboardPage() {
               </Card>
             </div>
 
-            <Card className="border-border/80 bg-card/92 shadow-[0_18px_40px_-32px_rgba(15,23,42,0.42)]">
+            <Card className="border-border/80 bg-card/[0.92] shadow-[0_18px_40px_-32px_rgba(15,23,42,0.42)]">
               <CardContent className="p-5">
                 <div className="mb-4 flex items-start justify-between gap-3">
                   <div className="space-y-1">
@@ -414,7 +414,7 @@ export default function DashboardPage() {
               </CardContent>
             </Card>
 
-            <Card className="border-border/80 bg-card/92 shadow-[0_18px_40px_-32px_rgba(15,23,42,0.42)]">
+            <Card className="border-border/80 bg-card/[0.92] shadow-[0_18px_40px_-32px_rgba(15,23,42,0.42)]">
               <CardContent className="p-5">
                 <div className="mb-4 flex items-start justify-between gap-3">
                   <div className="space-y-1">
@@ -431,7 +431,7 @@ export default function DashboardPage() {
               </CardContent>
             </Card>
 
-            <Card className="border-border/80 bg-card/92 shadow-[0_18px_40px_-32px_rgba(15,23,42,0.42)]">
+            <Card className="border-border/80 bg-card/[0.92] shadow-[0_18px_40px_-32px_rgba(15,23,42,0.42)]">
               <CardContent className="p-5">
                 <div className="mb-4 flex items-start justify-between gap-3">
                   <div className="space-y-1">

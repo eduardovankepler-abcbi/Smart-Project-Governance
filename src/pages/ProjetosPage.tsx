@@ -257,7 +257,7 @@ export default function ProjetosPage() {
                     {isExpanded ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
                   </button>
                 ) : (
-                  <span className="mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center text-muted-foreground/45">
+                  <span className="mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center text-muted-foreground/[0.45]">
                     <ListTree size={11} />
                   </span>
                 )}
@@ -334,7 +334,7 @@ export default function ProjetosPage() {
           </div>
         </div>
 
-        <div className="grid gap-3 rounded-xl border border-border/60 bg-background/35 px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground lg:grid-cols-[92px_72px_108px_minmax(0,1fr)_220px]">
+        <div className="grid gap-3 rounded-xl border border-border/60 bg-background/[0.35] px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground lg:grid-cols-[92px_72px_108px_minmax(0,1fr)_220px]">
           <span>EDT</span>
           <span>%</span>
           <span>Status</span>

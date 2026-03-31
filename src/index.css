@@ -90,7 +90,7 @@
 
 @layer components {
   .surface-panel {
-    @apply rounded-[28px] border border-white/6 bg-card/95 shadow-[0_24px_60px_-34px_rgba(3,8,24,0.85)];
+    @apply rounded-[28px] border border-white/[0.06] bg-card/[0.95] shadow-[0_24px_60px_-34px_rgba(3,8,24,0.85)];
   }
 
   .section-shell {
