@@ -305,16 +305,18 @@ export default function DashboardPage() {
               {kpis.map(({ label, value, icon: Icon, color, detailA, detailB }) => (
                 <Card key={label} className="min-w-0 border-white/[0.06] bg-white/[0.02] shadow-none">
                   <CardContent className="space-y-4 p-4">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0 space-y-1">
+                    <div className="space-y-3">
+                      <div className="flex items-start justify-between gap-3">
                         <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">{label}</p>
-                        <p className="break-words text-[clamp(1.7rem,2vw,2.5rem)] font-display font-bold leading-[0.95] text-foreground">
+                        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-white/[0.04]">
+                          <Icon size={18} className={color} />
+                        </span>
+                      </div>
+                      <div className="min-w-0">
+                        <p className="overflow-hidden text-ellipsis whitespace-nowrap text-[clamp(1.7rem,2vw,2.5rem)] font-display font-bold leading-[0.95] text-foreground">
                           {value}
                         </p>
                       </div>
-                      <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-white/[0.04]">
-                        <Icon size={18} className={color} />
-                      </span>
                     </div>
                     <div className="space-y-2 border-t border-white/[0.06] pt-3 text-xs leading-relaxed text-muted-foreground">
                       <div className="min-w-0 break-words">{detailA}</div>
