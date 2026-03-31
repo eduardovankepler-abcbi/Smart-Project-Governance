@@ -300,32 +300,34 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          <div className="mt-6 flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
-            <div className="grid flex-1 grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-6">
+          <div className="mt-6 space-y-4">
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6">
               {kpis.map(({ label, value, icon: Icon, color, detailA, detailB }) => (
-                <Card key={label} className="border-white/[0.06] bg-white/[0.02] shadow-none">
+                <Card key={label} className="min-w-0 border-white/[0.06] bg-white/[0.02] shadow-none">
                   <CardContent className="space-y-4 p-4">
                     <div className="flex items-start justify-between gap-3">
-                      <div className="space-y-1">
+                      <div className="min-w-0 space-y-1">
                         <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">{label}</p>
-                        <p className="text-3xl font-display font-bold text-foreground">{value}</p>
+                        <p className="break-words text-[clamp(1.9rem,2.2vw,3rem)] font-display font-bold leading-none text-foreground">
+                          {value}
+                        </p>
                       </div>
-                      <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white/[0.04]">
+                      <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-white/[0.04]">
                         <Icon size={18} className={color} />
                       </span>
                     </div>
-                    <div className="grid grid-cols-2 gap-3 border-t border-white/[0.06] pt-3 text-xs text-muted-foreground">
-                      <div>{detailA}</div>
-                      <div>{detailB}</div>
+                    <div className="grid grid-cols-1 gap-2 border-t border-white/[0.06] pt-3 text-xs leading-relaxed text-muted-foreground sm:grid-cols-2">
+                      <div className="min-w-0 break-words">{detailA}</div>
+                      <div className="min-w-0 break-words">{detailB}</div>
                     </div>
                   </CardContent>
                 </Card>
               ))}
             </div>
 
-            <div className="flex flex-wrap gap-3">
+            <div className="flex justify-end">
               <Select value={filterProjeto} onValueChange={(value) => updateSearchParam("projeto", value)}>
-                <SelectTrigger className="w-60 rounded-2xl border-white/[0.08] bg-white/[0.03]">
+                <SelectTrigger className="w-full max-w-xs rounded-2xl border-white/[0.08] bg-white/[0.03]">
                   <SelectValue placeholder="Projeto" />
                 </SelectTrigger>
                 <SelectContent>
