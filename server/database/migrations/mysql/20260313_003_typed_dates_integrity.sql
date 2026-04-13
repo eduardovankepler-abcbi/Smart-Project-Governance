@@ -1,56 +1,56 @@
 SET @sql = IF(
   EXISTS(SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'projetos' AND COLUMN_NAME = 'data_inicio_planej_date'),
   'SELECT 1',
-  "ALTER TABLE projetos ADD COLUMN data_inicio_planej_date DATE NULL"
+  'ALTER TABLE projetos ADD COLUMN data_inicio_planej_date DATE NULL'
 );
 PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 
 SET @sql = IF(
   EXISTS(SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'projetos' AND COLUMN_NAME = 'data_fim_planej_date'),
   'SELECT 1',
-  "ALTER TABLE projetos ADD COLUMN data_fim_planej_date DATE NULL"
+  'ALTER TABLE projetos ADD COLUMN data_fim_planej_date DATE NULL'
 );
 PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 
 SET @sql = IF(
   EXISTS(SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'projetos' AND COLUMN_NAME = 'data_inicio_real_date'),
   'SELECT 1',
-  "ALTER TABLE projetos ADD COLUMN data_inicio_real_date DATE NULL"
+  'ALTER TABLE projetos ADD COLUMN data_inicio_real_date DATE NULL'
 );
 PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 
 SET @sql = IF(
   EXISTS(SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'projetos' AND COLUMN_NAME = 'data_fim_real_date'),
   'SELECT 1',
-  "ALTER TABLE projetos ADD COLUMN data_fim_real_date DATE NULL"
+  'ALTER TABLE projetos ADD COLUMN data_fim_real_date DATE NULL'
 );
 PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 
 SET @sql = IF(
   EXISTS(SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'tarefas' AND COLUMN_NAME = 'data_inicio_planej_date'),
   'SELECT 1',
-  "ALTER TABLE tarefas ADD COLUMN data_inicio_planej_date DATE NULL"
+  'ALTER TABLE tarefas ADD COLUMN data_inicio_planej_date DATE NULL'
 );
 PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 
 SET @sql = IF(
   EXISTS(SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'tarefas' AND COLUMN_NAME = 'data_fim_planej_date'),
   'SELECT 1',
-  "ALTER TABLE tarefas ADD COLUMN data_fim_planej_date DATE NULL"
+  'ALTER TABLE tarefas ADD COLUMN data_fim_planej_date DATE NULL'
 );
 PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 
 SET @sql = IF(
   EXISTS(SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'tarefas' AND COLUMN_NAME = 'data_inicio_real_date'),
   'SELECT 1',
-  "ALTER TABLE tarefas ADD COLUMN data_inicio_real_date DATE NULL"
+  'ALTER TABLE tarefas ADD COLUMN data_inicio_real_date DATE NULL'
 );
 PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 
 SET @sql = IF(
   EXISTS(SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'tarefas' AND COLUMN_NAME = 'data_fim_real_date'),
   'SELECT 1',
-  "ALTER TABLE tarefas ADD COLUMN data_fim_real_date DATE NULL"
+  'ALTER TABLE tarefas ADD COLUMN data_fim_real_date DATE NULL'
 );
 PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 
@@ -128,62 +128,62 @@ WHERE p.id IS NULL;
 SET @sql = IF(
   EXISTS(SELECT 1 FROM INFORMATION_SCHEMA.STATISTICS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'projetos' AND INDEX_NAME = 'idx_projetos_data_inicio_planej_date'),
   'SELECT 1',
-  "ALTER TABLE projetos ADD INDEX idx_projetos_data_inicio_planej_date (data_inicio_planej_date)"
+  'ALTER TABLE projetos ADD INDEX idx_projetos_data_inicio_planej_date (data_inicio_planej_date)'
 );
 PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 
 SET @sql = IF(
   EXISTS(SELECT 1 FROM INFORMATION_SCHEMA.STATISTICS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'projetos' AND INDEX_NAME = 'idx_projetos_data_fim_planej_date'),
   'SELECT 1',
-  "ALTER TABLE projetos ADD INDEX idx_projetos_data_fim_planej_date (data_fim_planej_date)"
+  'ALTER TABLE projetos ADD INDEX idx_projetos_data_fim_planej_date (data_fim_planej_date)'
 );
 PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 
 SET @sql = IF(
   EXISTS(SELECT 1 FROM INFORMATION_SCHEMA.STATISTICS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'tarefas' AND INDEX_NAME = 'idx_tarefas_data_inicio_planej_date'),
   'SELECT 1',
-  "ALTER TABLE tarefas ADD INDEX idx_tarefas_data_inicio_planej_date (data_inicio_planej_date)"
+  'ALTER TABLE tarefas ADD INDEX idx_tarefas_data_inicio_planej_date (data_inicio_planej_date)'
 );
 PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 
 SET @sql = IF(
   EXISTS(SELECT 1 FROM INFORMATION_SCHEMA.STATISTICS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'tarefas' AND INDEX_NAME = 'idx_tarefas_data_fim_planej_date'),
   'SELECT 1',
-  "ALTER TABLE tarefas ADD INDEX idx_tarefas_data_fim_planej_date (data_fim_planej_date)"
+  'ALTER TABLE tarefas ADD INDEX idx_tarefas_data_fim_planej_date (data_fim_planej_date)'
 );
 PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 
 SET @sql = IF(
   EXISTS(SELECT 1 FROM INFORMATION_SCHEMA.REFERENTIAL_CONSTRAINTS WHERE CONSTRAINT_SCHEMA = DATABASE() AND CONSTRAINT_NAME = 'fk_produtos_business_unit'),
   'SELECT 1',
-  "ALTER TABLE produtos ADD CONSTRAINT fk_produtos_business_unit FOREIGN KEY (business_unit_id) REFERENCES business_units(id) ON DELETE RESTRICT"
+  'ALTER TABLE produtos ADD CONSTRAINT fk_produtos_business_unit FOREIGN KEY (business_unit_id) REFERENCES business_units(id) ON DELETE RESTRICT'
 );
 PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 
 SET @sql = IF(
   EXISTS(SELECT 1 FROM INFORMATION_SCHEMA.REFERENTIAL_CONSTRAINTS WHERE CONSTRAINT_SCHEMA = DATABASE() AND CONSTRAINT_NAME = 'fk_projetos_business_unit'),
   'SELECT 1',
-  "ALTER TABLE projetos ADD CONSTRAINT fk_projetos_business_unit FOREIGN KEY (business_unit_id) REFERENCES business_units(id) ON DELETE RESTRICT"
+  'ALTER TABLE projetos ADD CONSTRAINT fk_projetos_business_unit FOREIGN KEY (business_unit_id) REFERENCES business_units(id) ON DELETE RESTRICT'
 );
 PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 
 SET @sql = IF(
   EXISTS(SELECT 1 FROM INFORMATION_SCHEMA.REFERENTIAL_CONSTRAINTS WHERE CONSTRAINT_SCHEMA = DATABASE() AND CONSTRAINT_NAME = 'fk_projetos_produto'),
   'SELECT 1',
-  "ALTER TABLE projetos ADD CONSTRAINT fk_projetos_produto FOREIGN KEY (produto_id) REFERENCES produtos(id) ON DELETE SET NULL"
+  'ALTER TABLE projetos ADD CONSTRAINT fk_projetos_produto FOREIGN KEY (produto_id) REFERENCES produtos(id) ON DELETE SET NULL'
 );
 PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 
 SET @sql = IF(
   EXISTS(SELECT 1 FROM INFORMATION_SCHEMA.REFERENTIAL_CONSTRAINTS WHERE CONSTRAINT_SCHEMA = DATABASE() AND CONSTRAINT_NAME = 'fk_users_resource'),
   'SELECT 1',
-  "ALTER TABLE users ADD CONSTRAINT fk_users_resource FOREIGN KEY (resource_id) REFERENCES recursos(id) ON DELETE SET NULL"
+  'ALTER TABLE users ADD CONSTRAINT fk_users_resource FOREIGN KEY (resource_id) REFERENCES recursos(id) ON DELETE SET NULL'
 );
 PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 
 SET @sql = IF(
   EXISTS(SELECT 1 FROM INFORMATION_SCHEMA.REFERENTIAL_CONSTRAINTS WHERE CONSTRAINT_SCHEMA = DATABASE() AND CONSTRAINT_NAME = 'fk_user_project_access_project'),
   'SELECT 1',
-  "ALTER TABLE user_project_access ADD CONSTRAINT fk_user_project_access_project FOREIGN KEY (project_id) REFERENCES projetos(id) ON DELETE CASCADE"
+  'ALTER TABLE user_project_access ADD CONSTRAINT fk_user_project_access_project FOREIGN KEY (project_id) REFERENCES projetos(id) ON DELETE CASCADE'
 );
 PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;

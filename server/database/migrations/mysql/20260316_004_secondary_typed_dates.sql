@@ -1,7 +1,7 @@
 SET @sql = IF(
   EXISTS(SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'tarefas' AND COLUMN_NAME = 'constraint_date_date'),
   'SELECT 1',
-  "ALTER TABLE tarefas ADD COLUMN constraint_date_date DATE NULL"
+  'ALTER TABLE tarefas ADD COLUMN constraint_date_date DATE NULL'
 );
 PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 
@@ -18,6 +18,6 @@ WHERE constraint_date_date IS NULL
 SET @sql = IF(
   EXISTS(SELECT 1 FROM INFORMATION_SCHEMA.STATISTICS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'tarefas' AND INDEX_NAME = 'idx_tarefas_constraint_date_date'),
   'SELECT 1',
-  "ALTER TABLE tarefas ADD INDEX idx_tarefas_constraint_date_date (constraint_date_date)"
+  'ALTER TABLE tarefas ADD INDEX idx_tarefas_constraint_date_date (constraint_date_date)'
 );
 PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
