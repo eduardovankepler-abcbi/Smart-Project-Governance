@@ -38,7 +38,12 @@ async function ensureBaseSchema(connection) {
     .replace(/CREATE DATABASE IF NOT EXISTS[\s\S]*?USE\s+[^\n;]+;\s*/i, "")
     .replace(/DROP TABLE IF EXISTS schema_migrations;\s*CREATE TABLE schema_migrations\s*\([\s\S]*?\)\s*ENGINE=InnoDB;\s*/i, "");
 
-  await connection.query(schemaSql);
+  await connection.query("SET FOREIGN_KEY_CHECKS=0");
+  try {
+    await connection.query(schemaSql);
+  } finally {
+    await connection.query("SET FOREIGN_KEY_CHECKS=1");
+  }
   console.log("Base schema bootstrap completed.");
 }
 
