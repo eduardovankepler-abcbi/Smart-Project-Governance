@@ -38,6 +38,8 @@ DB_PORT=3306
 DB_USER=...
 DB_PASSWORD=...
 DB_NAME=...
+DB_SSL_MODE=disabled
+DB_SSL_CA=
 API_KEY=...
 ENABLE_GLOBAL_API_KEY=false
 CORS_ORIGINS=https://SEU_FRONTEND.vercel.app
@@ -77,6 +79,31 @@ A documentacao oficial da Render confirma suporte a bancos proprios com disco pe
 3. apontar o backend Render para o host interno do MySQL
 4. fazer o health check
 5. atualizar a Vercel com a nova URL da API
+
+## Opcao C: MySQL na Aiven
+
+Se voce ja tem um projeto na Aiven, esta e uma boa opcao para o periodo de testes e validacao. Ela tira o backend da Render da dependencia do MySQL da Railway.
+
+Na Aiven, pegue os dados em `Connection information` do servico MySQL:
+
+```env
+DB_HOST=HOST_DA_AIVEN
+DB_PORT=PORTA_DA_AIVEN
+DB_USER=USUARIO_DA_AIVEN
+DB_PASSWORD=SENHA_DA_AIVEN
+DB_NAME=NOME_DO_DATABASE
+DB_SSL_MODE=verify_ca
+DB_SSL_CA=COLE_AQUI_O_CA_CERTIFICATE
+```
+
+Para destravar primeiro e validar conectividade antes da verificacao completa de CA, voce pode usar temporariamente:
+
+```env
+DB_SSL_MODE=required
+DB_SSL_CA=
+```
+
+Depois volte para `verify_ca` com o certificado CA preenchido.
 
 ## Atualizacao da Vercel
 

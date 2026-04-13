@@ -26,6 +26,7 @@ const { syncProjectMetrics } = require("./utils/projectMetrics");
 const { parseMsProjectXml } = require("./utils/msProjectXml");
 const { logAudit } = require("./utils/audit");
 const { BASELINE_SOURCE_TYPES, createProjectBaseline } = require("./utils/baselines");
+const { withMysqlSsl } = require("./utils/mysqlConnection");
 const {
   ROLES,
   canWriteData,
@@ -215,7 +216,7 @@ function requireEnv(name) {
   return val;
 }
 
-const pool = mysql.createPool({
+const pool = mysql.createPool(withMysqlSsl({
   host: requireEnv("DB_HOST"),
   port: parseInt(process.env.DB_PORT || "3306", 10),
   user: requireEnv("DB_USER"),
@@ -224,7 +225,7 @@ const pool = mysql.createPool({
   charset: "utf8mb4",
   waitForConnections: true,
   connectionLimit: 10,
-});
+}));
 
 // ============================================
 // Rate limiter

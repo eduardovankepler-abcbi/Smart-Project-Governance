@@ -1,6 +1,7 @@
 const fs = require("fs");
 const path = require("path");
 const mysql = require("mysql2/promise");
+const { withMysqlSsl } = require("../utils/mysqlConnection");
 require("dotenv").config({ path: path.resolve(__dirname, "..", ".env") });
 require("dotenv").config({ path: path.resolve(__dirname, "..", "..", ".env"), override: false });
 
@@ -48,7 +49,7 @@ async function main() {
     return;
   }
 
-  const connection = await mysql.createConnection({
+  const connection = await mysql.createConnection(withMysqlSsl({
     host: process.env.DB_HOST,
     port: parseInt(process.env.DB_PORT || "3306", 10),
     user: process.env.DB_USER,
@@ -56,7 +57,7 @@ async function main() {
     database: process.env.DB_NAME,
     charset: "utf8mb4",
     multipleStatements: true,
-  });
+  }));
 
   try {
     await ensureBaseSchema(connection);
