@@ -27,6 +27,33 @@ function normalizeBaseSchemaForManagedMysql(schemaSql) {
     .replace(/(INDEX idx_audit_logs_actor \(actor_user_id\)),\s*\) ENGINE=InnoDB;/i, "$1\n) ENGINE=InnoDB;");
 }
 
+async function dropExistingBootstrapTables(connection) {
+  const tables = [
+    "project_template_tasks",
+    "project_templates",
+    "project_baseline_tasks",
+    "project_baselines",
+    "audit_logs",
+    "comentarios",
+    "task_dependencies",
+    "task_assignments",
+    "user_project_access",
+    "user_sessions",
+    "users",
+    "tarefas",
+    "projetos",
+    "produtos",
+    "recursos",
+    "business_units",
+    "schema_migrations",
+  ];
+
+  console.log("Cleaning partial bootstrap tables before schema rebuild.");
+  for (const table of tables) {
+    await connection.query(`DROP TABLE IF EXISTS \`${table}\``);
+  }
+}
+
 async function ensureBaseSchema(connection) {
   const requiredTables = ["users", "projetos", "tarefas", "task_assignments", "recursos"];
   const placeholders = requiredTables.map(() => "?").join(", ");
@@ -54,6 +81,7 @@ async function ensureBaseSchema(connection) {
 
   await connection.query("SET FOREIGN_KEY_CHECKS=0");
   try {
+    await dropExistingBootstrapTables(connection);
     await connection.query(schemaSql);
   } finally {
     await connection.query("SET FOREIGN_KEY_CHECKS=1");
