@@ -19,8 +19,7 @@ CREATE TABLE IF NOT EXISTS project_templates (
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   INDEX idx_project_templates_origin_project (origin_project_id),
   INDEX idx_project_templates_active (is_active),
-  CONSTRAINT fk_project_templates_origin_project FOREIGN KEY (origin_project_id) REFERENCES projetos(id) ON DELETE SET NULL,
-  CONSTRAINT fk_project_templates_created_by FOREIGN KEY (created_by_user_id) REFERENCES users(id) ON DELETE SET NULL
+  CONSTRAINT fk_project_templates_origin_project FOREIGN KEY (origin_project_id) REFERENCES projetos(id) ON DELETE SET NULL
 );
 
 CREATE TABLE IF NOT EXISTS project_template_tasks (

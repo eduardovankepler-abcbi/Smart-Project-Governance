@@ -27,8 +27,16 @@ function normalizeBaseSchemaForManagedMysql(schemaSql) {
     .replace(/(INDEX idx_audit_logs_actor \(actor_user_id\)),\s*\) ENGINE=InnoDB;/i, "$1\n) ENGINE=InnoDB;");
 }
 
+function quoteIdentifier(identifier) {
+  return `\`${String(identifier).replace(/`/g, "``")}\``;
+}
+
 async function dropExistingBootstrapTables(connection) {
+  const [[databaseRow]] = await connection.query("SELECT DATABASE() AS databaseName");
+  const databaseName = databaseRow?.databaseName || "";
   const tables = [
+    "development_plan_items",
+    "development_plans",
     "project_template_tasks",
     "project_templates",
     "project_baseline_tasks",
@@ -47,10 +55,24 @@ async function dropExistingBootstrapTables(connection) {
     "business_units",
     "schema_migrations",
   ];
+  const tablesToDrop = new Set(tables);
+
+  if (/^(smart_project_governance|abc_project_manager)$/i.test(databaseName)) {
+    const [existingTables] = await connection.query(
+      `SELECT TABLE_NAME
+         FROM INFORMATION_SCHEMA.TABLES
+        WHERE TABLE_SCHEMA = DATABASE()`
+    );
+    for (const row of existingTables) {
+      tablesToDrop.add(row.TABLE_NAME);
+    }
+  } else {
+    console.log(`Skipping dynamic bootstrap cleanup for unexpected database: ${databaseName}`);
+  }
 
   console.log("Cleaning partial bootstrap tables before schema rebuild.");
-  for (const table of tables) {
-    await connection.query(`DROP TABLE IF EXISTS \`${table}\``);
+  for (const table of tablesToDrop) {
+    await connection.query(`DROP TABLE IF EXISTS ${quoteIdentifier(table)}`);
   }
 }
 

@@ -25,9 +25,7 @@ CREATE TABLE IF NOT EXISTS project_baselines (
   INDEX idx_project_baselines_project (project_id),
   INDEX idx_project_baselines_status (status),
   INDEX idx_project_baselines_official (project_id, is_official),
-  CONSTRAINT fk_project_baselines_project FOREIGN KEY (project_id) REFERENCES projetos(id) ON DELETE CASCADE,
-  CONSTRAINT fk_project_baselines_requested_by FOREIGN KEY (requested_by_user_id) REFERENCES users(id) ON DELETE SET NULL,
-  CONSTRAINT fk_project_baselines_approved_by FOREIGN KEY (approved_by_user_id) REFERENCES users(id) ON DELETE SET NULL
+  CONSTRAINT fk_project_baselines_project FOREIGN KEY (project_id) REFERENCES projetos(id) ON DELETE CASCADE
 ) ENGINE=InnoDB;
 
 CREATE TABLE IF NOT EXISTS project_baseline_tasks (
