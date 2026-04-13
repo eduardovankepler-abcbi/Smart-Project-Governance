@@ -270,10 +270,7 @@ CREATE TABLE comentarios (
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   INDEX idx_comentarios_project (project_id),
   INDEX idx_comentarios_task (task_id),
-  INDEX idx_comentarios_author (author_user_id),
-  CONSTRAINT fk_comentarios_project FOREIGN KEY (project_id) REFERENCES projetos(id) ON DELETE CASCADE,
-  CONSTRAINT fk_comentarios_task FOREIGN KEY (task_id) REFERENCES tarefas(id) ON DELETE CASCADE,
-  CONSTRAINT fk_comentarios_author FOREIGN KEY (author_user_id) REFERENCES users(id) ON DELETE SET NULL
+  INDEX idx_comentarios_author (author_user_id)
 ) ENGINE=InnoDB;
 
 DROP TABLE IF EXISTS audit_logs;
@@ -292,9 +289,7 @@ CREATE TABLE audit_logs (
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   INDEX idx_audit_logs_project (project_id),
   INDEX idx_audit_logs_entity (entity_type, entity_id),
-  INDEX idx_audit_logs_actor (actor_user_id),
-  CONSTRAINT fk_audit_logs_project FOREIGN KEY (project_id) REFERENCES projetos(id) ON DELETE SET NULL,
-  CONSTRAINT fk_audit_logs_actor FOREIGN KEY (actor_user_id) REFERENCES users(id) ON DELETE SET NULL
+  INDEX idx_audit_logs_actor (actor_user_id)
 ) ENGINE=InnoDB;
 
 ALTER TABLE users
