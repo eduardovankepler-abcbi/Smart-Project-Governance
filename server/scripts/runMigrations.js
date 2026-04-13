@@ -16,6 +16,17 @@ if (optionalEnvPath) {
   require("dotenv").config({ path: optionalEnvPath, override: true });
 }
 
+function normalizeBaseSchemaForManagedMysql(schemaSql) {
+  return schemaSql
+    .replace(/\s*,?\s*CONSTRAINT fk_comentarios_project FOREIGN KEY \(project_id\) REFERENCES projetos\(id\) ON DELETE CASCADE/gi, "")
+    .replace(/\s*,?\s*CONSTRAINT fk_comentarios_task FOREIGN KEY \(task_id\) REFERENCES tarefas\(id\) ON DELETE CASCADE/gi, "")
+    .replace(/\s*,?\s*CONSTRAINT fk_comentarios_author FOREIGN KEY \(author_user_id\) REFERENCES users\(id\) ON DELETE SET NULL/gi, "")
+    .replace(/\s*,?\s*CONSTRAINT fk_audit_logs_project FOREIGN KEY \(project_id\) REFERENCES projetos\(id\) ON DELETE SET NULL/gi, "")
+    .replace(/\s*,?\s*CONSTRAINT fk_audit_logs_actor FOREIGN KEY \(actor_user_id\) REFERENCES users\(id\) ON DELETE SET NULL/gi, "")
+    .replace(/(INDEX idx_comentarios_author \(author_user_id\)),\s*\) ENGINE=InnoDB;/i, "$1\n) ENGINE=InnoDB;")
+    .replace(/(INDEX idx_audit_logs_actor \(actor_user_id\)),\s*\) ENGINE=InnoDB;/i, "$1\n) ENGINE=InnoDB;");
+}
+
 async function ensureBaseSchema(connection) {
   const requiredTables = ["users", "projetos", "tarefas", "task_assignments", "recursos"];
   const placeholders = requiredTables.map(() => "?").join(", ");
@@ -37,6 +48,9 @@ async function ensureBaseSchema(connection) {
   schemaSql = schemaSql
     .replace(/CREATE DATABASE IF NOT EXISTS[\s\S]*?USE\s+[^\n;]+;\s*/i, "")
     .replace(/DROP TABLE IF EXISTS schema_migrations;\s*CREATE TABLE schema_migrations\s*\([\s\S]*?\)\s*ENGINE=InnoDB;\s*/i, "");
+  schemaSql = normalizeBaseSchemaForManagedMysql(schemaSql);
+
+  console.log("Base schema prepared for managed MySQL bootstrap.");
 
   await connection.query("SET FOREIGN_KEY_CHECKS=0");
   try {
