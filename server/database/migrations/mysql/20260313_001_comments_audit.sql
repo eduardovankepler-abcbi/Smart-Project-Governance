@@ -50,49 +50,49 @@ CREATE TABLE IF NOT EXISTS task_assignments (
 SET @sql = IF(
   EXISTS(SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'task_assignments' AND COLUMN_NAME = 'resource_id'),
   'SELECT 1',
-  "ALTER TABLE task_assignments ADD COLUMN resource_id INT NULL AFTER task_id"
+  'ALTER TABLE task_assignments ADD COLUMN resource_id INT NULL AFTER task_id'
 );
 PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 
 SET @sql = IF(
   EXISTS(SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'task_assignments' AND COLUMN_NAME = 'resource_name'),
   'SELECT 1',
-  "ALTER TABLE task_assignments ADD COLUMN resource_name VARCHAR(100) DEFAULT '' AFTER resource_id"
+  'ALTER TABLE task_assignments ADD COLUMN resource_name VARCHAR(100) DEFAULT '''' AFTER resource_id'
 );
 PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 
 SET @sql = IF(
   EXISTS(SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'task_assignments' AND COLUMN_NAME = 'units'),
   'SELECT 1',
-  "ALTER TABLE task_assignments ADD COLUMN units DECIMAL(8,4) DEFAULT 1 AFTER resource_name"
+  'ALTER TABLE task_assignments ADD COLUMN units DECIMAL(8,4) DEFAULT 1 AFTER resource_name'
 );
 PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 
 SET @sql = IF(
   EXISTS(SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'task_assignments' AND COLUMN_NAME = 'work'),
   'SELECT 1',
-  "ALTER TABLE task_assignments ADD COLUMN work DECIMAL(10,2) DEFAULT 0 AFTER units"
+  'ALTER TABLE task_assignments ADD COLUMN work DECIMAL(10,2) DEFAULT 0 AFTER units'
 );
 PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 
 SET @sql = IF(
   EXISTS(SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'task_assignments' AND COLUMN_NAME = 'actual_work'),
   'SELECT 1',
-  "ALTER TABLE task_assignments ADD COLUMN actual_work DECIMAL(10,2) DEFAULT 0 AFTER work"
+  'ALTER TABLE task_assignments ADD COLUMN actual_work DECIMAL(10,2) DEFAULT 0 AFTER work'
 );
 PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 
 SET @sql = IF(
   EXISTS(SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'task_assignments' AND COLUMN_NAME = 'remaining_work'),
   'SELECT 1',
-  "ALTER TABLE task_assignments ADD COLUMN remaining_work DECIMAL(10,2) DEFAULT 0 AFTER actual_work"
+  'ALTER TABLE task_assignments ADD COLUMN remaining_work DECIMAL(10,2) DEFAULT 0 AFTER actual_work'
 );
 PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 
 SET @sql = IF(
   EXISTS(SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'task_assignments' AND COLUMN_NAME = 'cost'),
   'SELECT 1',
-  "ALTER TABLE task_assignments ADD COLUMN cost DECIMAL(12,2) DEFAULT 0 AFTER remaining_work"
+  'ALTER TABLE task_assignments ADD COLUMN cost DECIMAL(12,2) DEFAULT 0 AFTER remaining_work'
 );
 PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 
@@ -107,6 +107,6 @@ WHERE ta1.resource_id IS NOT NULL;
 SET @sql = IF(
   EXISTS(SELECT 1 FROM INFORMATION_SCHEMA.STATISTICS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'task_assignments' AND INDEX_NAME = 'uq_task_resource_assignment'),
   'SELECT 1',
-  "ALTER TABLE task_assignments ADD CONSTRAINT uq_task_resource_assignment UNIQUE (task_id, resource_id)"
+  'ALTER TABLE task_assignments ADD CONSTRAINT uq_task_resource_assignment UNIQUE (task_id, resource_id)'
 );
 PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;

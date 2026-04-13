@@ -118,6 +118,14 @@ async function ensureBaseSchema(connection) {
   console.log("Base schema bootstrap completed.");
 }
 
+async function configureMysqlSession(connection) {
+  try {
+    await connection.query("SET SESSION sql_mode = REPLACE(@@SESSION.sql_mode, 'ANSI_QUOTES', '')");
+  } catch (error) {
+    console.warn("Could not normalize MySQL sql_mode; continuing with provider defaults.", error.message);
+  }
+}
+
 async function main() {
   const migrationsDir = path.resolve(__dirname, "..", "database", "migrations", "mysql");
   if (!fs.existsSync(migrationsDir)) {
@@ -136,6 +144,7 @@ async function main() {
   }));
 
   try {
+    await configureMysqlSession(connection);
     await ensureBaseSchema(connection);
 
     await connection.query(`
