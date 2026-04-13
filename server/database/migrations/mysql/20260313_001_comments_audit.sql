@@ -33,6 +33,69 @@ CREATE TABLE IF NOT EXISTS audit_logs (
   INDEX idx_audit_logs_actor (actor_user_id)
 );
 
+CREATE TABLE IF NOT EXISTS task_assignments (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  task_id VARCHAR(20) NOT NULL,
+  resource_id INT NULL,
+  resource_name VARCHAR(100) DEFAULT '',
+  units DECIMAL(8,4) DEFAULT 1,
+  work DECIMAL(10,2) DEFAULT 0,
+  actual_work DECIMAL(10,2) DEFAULT 0,
+  remaining_work DECIMAL(10,2) DEFAULT 0,
+  cost DECIMAL(12,2) DEFAULT 0,
+  INDEX idx_task_assignments_task (task_id),
+  INDEX idx_task_assignments_resource (resource_id)
+) ENGINE=InnoDB;
+
+SET @sql = IF(
+  EXISTS(SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'task_assignments' AND COLUMN_NAME = 'resource_id'),
+  'SELECT 1',
+  "ALTER TABLE task_assignments ADD COLUMN resource_id INT NULL AFTER task_id"
+);
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @sql = IF(
+  EXISTS(SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'task_assignments' AND COLUMN_NAME = 'resource_name'),
+  'SELECT 1',
+  "ALTER TABLE task_assignments ADD COLUMN resource_name VARCHAR(100) DEFAULT '' AFTER resource_id"
+);
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @sql = IF(
+  EXISTS(SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'task_assignments' AND COLUMN_NAME = 'units'),
+  'SELECT 1',
+  "ALTER TABLE task_assignments ADD COLUMN units DECIMAL(8,4) DEFAULT 1 AFTER resource_name"
+);
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @sql = IF(
+  EXISTS(SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'task_assignments' AND COLUMN_NAME = 'work'),
+  'SELECT 1',
+  "ALTER TABLE task_assignments ADD COLUMN work DECIMAL(10,2) DEFAULT 0 AFTER units"
+);
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @sql = IF(
+  EXISTS(SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'task_assignments' AND COLUMN_NAME = 'actual_work'),
+  'SELECT 1',
+  "ALTER TABLE task_assignments ADD COLUMN actual_work DECIMAL(10,2) DEFAULT 0 AFTER work"
+);
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @sql = IF(
+  EXISTS(SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'task_assignments' AND COLUMN_NAME = 'remaining_work'),
+  'SELECT 1',
+  "ALTER TABLE task_assignments ADD COLUMN remaining_work DECIMAL(10,2) DEFAULT 0 AFTER actual_work"
+);
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @sql = IF(
+  EXISTS(SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'task_assignments' AND COLUMN_NAME = 'cost'),
+  'SELECT 1',
+  "ALTER TABLE task_assignments ADD COLUMN cost DECIMAL(12,2) DEFAULT 0 AFTER remaining_work"
+);
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
 DELETE ta1
 FROM task_assignments ta1
 INNER JOIN task_assignments ta2
