@@ -16,6 +16,10 @@ if (optionalEnvPath) {
   require("dotenv").config({ path: optionalEnvPath, override: true });
 }
 
+function isAllowedBootstrapDatabase(databaseName) {
+  return /^(smart_project_governance|abc_project_manager)$/i.test(databaseName || "");
+}
+
 function normalizeBaseSchemaForManagedMysql(schemaSql) {
   return schemaSql
     .replace(/\s*,?\s*CONSTRAINT fk_comentarios_project FOREIGN KEY \(project_id\) REFERENCES projetos\(id\) ON DELETE CASCADE/gi, "")
@@ -57,7 +61,7 @@ async function dropExistingBootstrapTables(connection) {
   ];
   const tablesToDrop = new Set(tables);
 
-  if (/^(smart_project_governance|abc_project_manager)$/i.test(databaseName)) {
+  if (isAllowedBootstrapDatabase(databaseName)) {
     const [existingTables] = await connection.query(
       `SELECT TABLE_NAME
          FROM INFORMATION_SCHEMA.TABLES
@@ -67,7 +71,10 @@ async function dropExistingBootstrapTables(connection) {
       tablesToDrop.add(row.TABLE_NAME);
     }
   } else {
-    console.log(`Skipping dynamic bootstrap cleanup for unexpected database: ${databaseName}`);
+    throw new Error(
+      `Refusing to bootstrap unexpected database "${databaseName}". ` +
+        "Set DB_NAME to smart_project_governance before deploying."
+    );
   }
 
   console.log("Cleaning partial bootstrap tables before schema rebuild.");
