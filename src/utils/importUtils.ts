@@ -3,21 +3,75 @@ import type { Projeto, Tarefa, Recurso } from "@/data/projectData";
 
 function str(val: unknown, maxLen = 255): string {
   if (val == null) return "";
-  return String(val).slice(0, maxLen).trim();
+  const unwrapped = unwrapCellValue(val);
+  if (unwrapped instanceof Date) return formatDate(unwrapped).slice(0, maxLen);
+  return String(unwrapped ?? "").slice(0, maxLen).trim();
 }
 
 function num(val: unknown, def = 0): number {
-  const n = parseFloat(String(val));
+  const unwrapped = unwrapCellValue(val);
+  if (unwrapped == null || unwrapped === "") return def;
+  if (typeof unwrapped === "number") return unwrapped;
+  const raw = String(unwrapped).trim().replace(/\s/g, "").replace(/[R$€]/g, "");
+  const lastDot = raw.lastIndexOf(".");
+  const lastComma = raw.lastIndexOf(",");
+  const normalized = lastComma > lastDot
+    ? raw.replace(/\./g, "").replace(",", ".")
+    : raw.replace(/,/g, "");
+  const n = parseFloat(normalized);
   return isNaN(n) ? def : n;
 }
 
 function int(val: unknown, def = 0): number {
-  const n = parseInt(String(val), 10);
+  const n = Math.round(num(val, def));
   return isNaN(n) ? def : n;
 }
 
 function normalize(s: string): string {
-  return s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[_\s]+/g, " ").trim();
+  return String(s)
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[_\s%.-]+/g, " ")
+    .trim();
+}
+
+function formatDate(date: Date): string {
+  if (isNaN(date.getTime())) return "";
+  return `${date.getMonth() + 1}/${date.getDate()}/${date.getFullYear().toString().slice(-2)}`;
+}
+
+function unwrapCellValue(val: unknown): unknown {
+  if (val == null) return "";
+  if (val instanceof Date) return val;
+  if (typeof val !== "object") return val;
+
+  const cell = val as Record<string, unknown>;
+  if (Array.isArray(cell.richText)) {
+    return cell.richText
+      .map((part) => typeof part === "object" && part && "text" in part ? String((part as { text: unknown }).text) : "")
+      .join("");
+  }
+  if ("result" in cell) return unwrapCellValue(cell.result);
+  if ("text" in cell) return unwrapCellValue(cell.text);
+  if ("formula" in cell && "result" in cell) return unwrapCellValue(cell.result);
+
+  return val;
+}
+
+function isEmptyCellValue(val: unknown): boolean {
+  const unwrapped = unwrapCellValue(val);
+  return unwrapped == null || String(unwrapped).trim() === "";
+}
+
+function readFileAsArrayBuffer(file: File): Promise<ArrayBuffer> {
+  if (typeof file.arrayBuffer === "function") return file.arrayBuffer();
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as ArrayBuffer);
+    reader.onerror = () => reject(reader.error ?? new Error("Erro ao ler arquivo"));
+    reader.readAsArrayBuffer(file);
+  });
 }
 
 function findSheet(workbook: ExcelJS.Workbook, ...names: string[]): ExcelJS.Worksheet | undefined {
@@ -45,18 +99,32 @@ function sheetToObjects(sheet: ExcelJS.Worksheet): Record<string, unknown>[] {
 
   console.log(`[ExcelImport] Aba "${sheet.name}": ${rowCount} linhas, ${colCount} colunas`);
 
-  // Find header row (first row with at least 2 non-empty cells)
+  // Find the most likely header row. Some exported spreadsheets include
+  // titles or blank metadata rows before the real table header.
   let headerRowNum = 0;
+  let bestScore = 0;
+  const knownHeaders = [
+    "id", "projeto", "tarefa", "nome", "responsavel", "status",
+    "data inicio", "data fim", "valor previsto", "valor gasto",
+    "funcao", "prioridade", "parent id",
+  ];
+
   for (let r = 1; r <= Math.min(rowCount, 10); r++) {
     const row = sheet.getRow(r);
     let nonEmpty = 0;
+    let score = 0;
     for (let c = 1; c <= colCount; c++) {
-      const val = row.getCell(c).value;
-      if (val != null && String(val).trim() !== "") nonEmpty++;
+      const val = unwrapCellValue(row.getCell(c).value);
+      if (!isEmptyCellValue(val)) {
+        nonEmpty++;
+        const normalized = normalize(String(val));
+        if (knownHeaders.some(h => normalized === h || normalized.includes(h))) score += 2;
+      }
     }
-    if (nonEmpty >= 2) {
+    score += Math.min(nonEmpty, 4);
+    if (nonEmpty >= 2 && score > bestScore) {
+      bestScore = score;
       headerRowNum = r;
-      break;
     }
   }
 
@@ -68,7 +136,7 @@ function sheetToObjects(sheet: ExcelJS.Worksheet): Record<string, unknown>[] {
   // Read headers
   const headerRow = sheet.getRow(headerRowNum);
   for (let c = 1; c <= colCount; c++) {
-    const val = headerRow.getCell(c).value;
+    const val = unwrapCellValue(headerRow.getCell(c).value);
     headers[c] = val != null ? str(val) : "";
   }
   console.log(`[ExcelImport] Cabeçalhos (linha ${headerRowNum}):`, headers.filter(Boolean));
@@ -81,17 +149,9 @@ function sheetToObjects(sheet: ExcelJS.Worksheet): Record<string, unknown>[] {
     for (let c = 1; c <= colCount; c++) {
       if (!headers[c]) continue;
       const cell = row.getCell(c);
-      const val = cell.value;
-      if (val != null && val !== "") {
-        // Handle ExcelJS rich text
-        if (typeof val === "object" && "richText" in (val as object)) {
-          obj[headers[c]] = (val as { richText: { text: string }[] }).richText.map(rt => rt.text).join("");
-        } else if (typeof val === "object" && "result" in (val as object)) {
-          // Formula cell — use computed result
-          obj[headers[c]] = (val as { result: unknown }).result;
-        } else {
-          obj[headers[c]] = val;
-        }
+      const val = unwrapCellValue(cell.value);
+      if (!isEmptyCellValue(val)) {
+        obj[headers[c]] = val;
         hasData = true;
       }
     }
@@ -129,7 +189,7 @@ export interface ImportResult {
 }
 
 export async function parseExcelFile(file: File): Promise<ImportResult> {
-  const buffer = await file.arrayBuffer();
+  const buffer = await readFileAsArrayBuffer(file);
   const workbook = new ExcelJS.Workbook();
   await workbook.xlsx.load(buffer);
 
