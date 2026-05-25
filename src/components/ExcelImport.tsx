@@ -14,7 +14,7 @@ import * as api from "@/services/api";
 const MAX_IMPORT_SIZE_MB = 25;
 const MAX_IMPORT_SIZE_BYTES = MAX_IMPORT_SIZE_MB * 1024 * 1024;
 const IMPORT_CONFIRMATION_PHRASES = {
-  excel: "SUBSTITUIR TUDO",
+  excel: "SUBSTITUIR CRONOGRAMA",
   xml: "SUBSTITUIR CRONOGRAMA",
 } as const;
 
@@ -51,7 +51,7 @@ export default function ExcelImport() {
             description: `${result.imported.project}: ${result.imported.tarefas} tarefas e ${result.imported.recursos} recursos`,
           });
         } else {
-          const result = await api.importExcel(file);
+          const result = await api.importExcel(file, { mode: "replace_project" });
           await refreshAll();
           toast({
             title: "Importação concluída",
@@ -178,7 +178,7 @@ export default function ExcelImport() {
             <p className="text-sm text-muted-foreground">
               {pendingImportKind === "xml"
                 ? "Esta importação substituirá o cronograma existente do projeto encontrado no XML, incluindo tarefas, vínculos e alocações relacionadas."
-                : "Esta importação Excel substituirá em lote os dados importáveis do ambiente, incluindo projetos, tarefas, dependências, alocações e recursos."}
+                : "Esta importação Excel substituirá apenas o cronograma do projeto encontrado no arquivo, preservando os demais projetos do ambiente."}
             </p>
 
             <div className="rounded-lg border border-warning/30 bg-warning/10 p-3 text-sm text-foreground">

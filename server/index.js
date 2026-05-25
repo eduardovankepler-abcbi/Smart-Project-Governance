@@ -186,6 +186,91 @@ function parsePredecessors(value, externalIdToTaskId = new Map()) {
     .filter((item) => item.predecessorTaskId);
 }
 
+function buildImportedTaskId(projectId, sequence) {
+  return `p${projectId}-${sequence}`.slice(0, 20);
+}
+
+async function upsertScheduleProject(conn, { projectName, fileName, rootRow, edrawScheduleRows, recursos }) {
+  const percentual = sanitizeNumber(col(rootRow, "Progress", "% Concluído", "% Concluido"));
+  const status = mapScheduleStatus(col(rootRow, "Status"), percentual);
+  const dataInicioPlanej = parseExcelDate(col(rootRow, "Start", "Data Início Planejado"));
+  const dataFimPlanej = parseExcelDate(col(rootRow, "Finish", "Data Fim Planejado"));
+  const stats = {
+    concluidas: edrawScheduleRows.filter((row) => mapScheduleStatus(col(row, "Status"), sanitizeNumber(col(row, "Progress"))) === "Concluído").length,
+    andamento: edrawScheduleRows.filter((row) => mapScheduleStatus(col(row, "Status"), sanitizeNumber(col(row, "Progress"))) === "Em andamento").length,
+    atrasadas: edrawScheduleRows.filter((row) => mapScheduleStatus(col(row, "Status"), sanitizeNumber(col(row, "Progress"))) === "Atrasado").length,
+    naoIniciadas: edrawScheduleRows.filter((row) => mapScheduleStatus(col(row, "Status"), sanitizeNumber(col(row, "Progress"))) === "Não iniciado").length,
+  };
+
+  const [existingProjects] = await conn.query("SELECT id FROM projetos WHERE projeto = ? LIMIT 1", [projectName]);
+  if (existingProjects.length) {
+    const projectId = existingProjects[0].id;
+    await conn.query(
+      `UPDATE projetos
+       SET project_code=?, business_unit_id=COALESCE(business_unit_id, 1), business_unit_nome=COALESCE(NULLIF(business_unit_nome, ''), 'Corporativo'),
+           descricao=?, prioridade=COALESCE(NULLIF(prioridade, ''), '2- Média'), responsavel=?, ftes=?,
+           data_inicio_planej=?, data_inicio_planej_date=?, data_fim_planej=?, data_fim_planej_date=?,
+           data_inicio=?, data_inicio_real_date=?, data_fim_real='', data_fim_real_date=NULL,
+           total_tarefas=?, tarefas_concluidas=?, tarefas_andamento=?, tarefas_atrasadas=?, tarefas_nao_iniciadas=?, status=?, conclusao=?
+       WHERE id=?`,
+      [
+        buildProjectCode("", projectName),
+        `Importado de ${fileName}`,
+        sanitizeString(col(rootRow, "Resources", "Recursos"), 200),
+        recursos.size,
+        dataInicioPlanej,
+        normalizeDateInput(dataInicioPlanej) || null,
+        dataFimPlanej,
+        normalizeDateInput(dataFimPlanej) || null,
+        dataInicioPlanej,
+        normalizeDateInput(dataInicioPlanej) || null,
+        edrawScheduleRows.length,
+        stats.concluidas,
+        stats.andamento,
+        stats.atrasadas,
+        stats.naoIniciadas,
+        status,
+        percentual,
+        projectId,
+      ]
+    );
+    return projectId;
+  }
+
+  const [insertProject] = await conn.query(
+    `INSERT INTO projetos (project_code, business_unit_id, business_unit_nome, projeto, descricao, prioridade, responsavel, ftes, valor_previsto, valor_gasto, data_inicio_planej, data_inicio_planej_date, data_fim_planej, data_fim_planej_date, data_inicio, data_inicio_real_date, data_fim_real, data_fim_real_date, total_tarefas, tarefas_concluidas, tarefas_andamento, tarefas_atrasadas, tarefas_nao_iniciadas, status, conclusao)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [
+      buildProjectCode("", projectName),
+      1,
+      "Corporativo",
+      projectName,
+      `Importado de ${fileName}`,
+      "2- Média",
+      sanitizeString(col(rootRow, "Resources", "Recursos"), 200),
+      recursos.size,
+      0,
+      0,
+      dataInicioPlanej,
+      normalizeDateInput(dataInicioPlanej) || null,
+      dataFimPlanej,
+      normalizeDateInput(dataFimPlanej) || null,
+      dataInicioPlanej,
+      normalizeDateInput(dataInicioPlanej) || null,
+      "",
+      null,
+      edrawScheduleRows.length,
+      stats.concluidas,
+      stats.andamento,
+      stats.atrasadas,
+      stats.naoIniciadas,
+      status,
+      percentual,
+    ]
+  );
+  return insertProject.insertId;
+}
+
 // ============================================
 // CORS
 // ============================================
@@ -459,7 +544,7 @@ const uploadMsProject = multer({
   },
 });
 
-app.post("/api/import-excel", requireAuth, requireReplaceAllImportAccess, upload.single("file"), async (req, res) => {
+app.post("/api/import-excel", requireAuth, requireImportAccess, upload.single("file"), async (req, res) => {
   if (!req.file) return res.status(400).json({ error: "Nenhum arquivo enviado", code: "NO_FILE" });
 
   const filePath = req.file.path;
@@ -467,23 +552,40 @@ app.post("/api/import-excel", requireAuth, requireReplaceAllImportAccess, upload
   let imported = { projetos: 0, tarefas: 0, recursos: 0 };
 
   try {
-    requireImportConfirmation(req, {
-      mode: "replace_all",
-      phrase: IMPORT_CONFIRM_PHRASES.excel,
-      errorMessage: `Confirme a operação digitando "${IMPORT_CONFIRM_PHRASES.excel}" para substituir todos os dados importáveis.`,
-    });
     assertExcelFileIntegrity(req.file);
     const workbook = new ExcelJS.Workbook();
     await workbook.xlsx.readFile(filePath);
+    const edrawScheduleSheet = findSheetByColumns(workbook, "ID", "WBS", "Task", "Start", "Finish");
+    const projetoSheet = workbook.getWorksheet("Projeto") || workbook.getWorksheet("Projetos");
+    const edrawScheduleRows = edrawScheduleSheet ? sheetToObjects(edrawScheduleSheet) : [];
+    const isScheduleImport = !projetoSheet && edrawScheduleRows.length > 0;
+
+    if (!isScheduleImport && req.authUser?.role !== ROLES.ADMIN) {
+      return res.status(403).json({
+        error: "A importação Excel com substituição total é restrita a administradores",
+        code: "AUTH_IMPORT_REPLACE_DENIED",
+      });
+    }
+
+    requireImportConfirmation(req, isScheduleImport
+      ? {
+          mode: "replace_project",
+          phrase: IMPORT_CONFIRM_PHRASES.msProject,
+          errorMessage: `Confirme a operação digitando "${IMPORT_CONFIRM_PHRASES.msProject}" para substituir o cronograma existente do projeto importado.`,
+        }
+      : {
+          mode: "replace_all",
+          phrase: IMPORT_CONFIRM_PHRASES.excel,
+          errorMessage: `Confirme a operação digitando "${IMPORT_CONFIRM_PHRASES.excel}" para substituir todos os dados importáveis.`,
+        });
 
     const conn = await pool.getConnection();
 
     try {
       await conn.beginTransaction();
 
-      const edrawScheduleSheet = findSheetByColumns(workbook, "ID", "WBS", "Task", "Start", "Finish");
-      const projetoSheet = workbook.getWorksheet("Projeto") || workbook.getWorksheet("Projetos");
-      const edrawScheduleRows = edrawScheduleSheet ? sheetToObjects(edrawScheduleSheet) : [];
+      let scheduleProjectName = "";
+      let scheduleProjectId = null;
       if (projetoSheet) {
         const data = sheetToObjects(projetoSheet);
         if (data.length > MAX_ROWS) throw new Error(`Limite de ${MAX_ROWS} linhas excedido na aba Projeto`);
@@ -530,10 +632,6 @@ app.post("/api/import-excel", requireAuth, requireReplaceAllImportAccess, upload
       } else if (edrawScheduleRows.length) {
         const rootRow = edrawScheduleRows[0];
         const projectName = cleanTaskName(col(rootRow, "Task", "Tarefa")) || sanitizeString(req.file.originalname.replace(/\.(xlsx|xlsm)$/i, ""), 200);
-        const percentual = sanitizeNumber(col(rootRow, "Progress", "% Concluído", "% Concluido"));
-        const status = mapScheduleStatus(col(rootRow, "Status"), percentual);
-        const dataInicioPlanej = parseExcelDate(col(rootRow, "Start", "Data Início Planejado"));
-        const dataFimPlanej = parseExcelDate(col(rootRow, "Finish", "Data Fim Planejado"));
         const recursos = new Set();
         edrawScheduleRows.forEach((row) => {
           sanitizeString(col(row, "Resources", "Recursos", "Responsável", "Responsavel"), 500)
@@ -542,39 +640,14 @@ app.post("/api/import-excel", requireAuth, requireReplaceAllImportAccess, upload
             .filter(Boolean)
             .forEach((item) => recursos.add(item));
         });
-        await conn.query("DELETE FROM projetos");
-        await conn.query(
-          `INSERT INTO projetos (id, project_code, business_unit_id, business_unit_nome, projeto, descricao, prioridade, responsavel, ftes, valor_previsto, valor_gasto, data_inicio_planej, data_inicio_planej_date, data_fim_planej, data_fim_planej_date, data_inicio, data_inicio_real_date, data_fim_real, data_fim_real_date, total_tarefas, tarefas_concluidas, tarefas_andamento, tarefas_atrasadas, tarefas_nao_iniciadas, status, conclusao)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-          [
-            1,
-            buildProjectCode("", projectName),
-            1,
-            "Corporativo",
-            projectName,
-            `Importado de ${req.file.originalname}`,
-            "2- Média",
-            sanitizeString(col(rootRow, "Resources", "Recursos"), 200),
-            recursos.size,
-            0,
-            0,
-            dataInicioPlanej,
-            normalizeDateInput(dataInicioPlanej) || null,
-            dataFimPlanej,
-            normalizeDateInput(dataFimPlanej) || null,
-            dataInicioPlanej,
-            normalizeDateInput(dataInicioPlanej) || null,
-            "",
-            null,
-            edrawScheduleRows.length,
-            edrawScheduleRows.filter((row) => mapScheduleStatus(col(row, "Status"), sanitizeNumber(col(row, "Progress"))) === "Concluído").length,
-            edrawScheduleRows.filter((row) => mapScheduleStatus(col(row, "Status"), sanitizeNumber(col(row, "Progress"))) === "Em andamento").length,
-            edrawScheduleRows.filter((row) => mapScheduleStatus(col(row, "Status"), sanitizeNumber(col(row, "Progress"))) === "Atrasado").length,
-            edrawScheduleRows.filter((row) => mapScheduleStatus(col(row, "Status"), sanitizeNumber(col(row, "Progress"))) === "Não iniciado").length,
-            status,
-            percentual,
-          ]
-        );
+        scheduleProjectName = projectName;
+        scheduleProjectId = await upsertScheduleProject(conn, {
+          projectName,
+          fileName: req.file.originalname,
+          rootRow,
+          edrawScheduleRows,
+          recursos,
+        });
         imported.projetos++;
       }
 
@@ -588,24 +661,37 @@ app.post("/api/import-excel", requireAuth, requireReplaceAllImportAccess, upload
           data.forEach((row, index) => {
             const externalId = sanitizeString(col(row, "ID", "id"), 50) || String(index + 1);
             const wbs = sanitizeString(col(row, "WBS", "wbs"), 50) || externalId;
-            externalIdToTaskId.set(externalId, wbs);
+            externalIdToTaskId.set(externalId, buildImportedTaskId(scheduleProjectId, index + 1));
+            externalIdToTaskId.set(wbs, buildImportedTaskId(scheduleProjectId, index + 1));
           });
         }
-        await conn.query("DELETE FROM task_assignments");
-        await conn.query("DELETE FROM task_dependencies");
-        await conn.query("DELETE FROM tarefas");
+        if (isEdrawSchedule) {
+          await conn.query(
+            "DELETE FROM task_assignments WHERE task_id IN (SELECT id FROM tarefas WHERE projeto = ?)",
+            [scheduleProjectName]
+          );
+          await conn.query(
+            "DELETE FROM task_dependencies WHERE task_id IN (SELECT id FROM tarefas WHERE projeto = ?) OR predecessor_task_id IN (SELECT id FROM tarefas WHERE projeto = ?)",
+            [scheduleProjectName, scheduleProjectName]
+          );
+          await conn.query("DELETE FROM tarefas WHERE projeto = ?", [scheduleProjectName]);
+        } else {
+          await conn.query("DELETE FROM task_assignments");
+          await conn.query("DELETE FROM task_dependencies");
+          await conn.query("DELETE FROM tarefas");
+        }
         const pendingDependencies = [];
         for (let index = 0; index < data.length; index++) {
           const r = data[index];
+          const wbs = sanitizeString(col(r, "WBS", "wbs"), 50) || sanitizeString(col(r, "ID", "id"), 20) || String(index + 1);
           const taskId = isEdrawSchedule
-            ? sanitizeString(col(r, "WBS", "wbs"), 20) || sanitizeString(col(r, "ID", "id"), 20)
+            ? buildImportedTaskId(scheduleProjectId, index + 1)
             : sanitizeString(col(r, "ID", "id"), 20);
           const externalId = isEdrawSchedule
             ? sanitizeString(col(r, "ID", "id"), 50) || String(index + 1)
             : sanitizeString(col(r, "External ID", "externalId", "external_id"), 50);
-          const wbs = isEdrawSchedule ? taskId : sanitizeString(col(r, "WBS", "wbs"), 50) || taskId;
           const parentId = isEdrawSchedule
-            ? parentFromWbs(wbs)
+            ? externalIdToTaskId.get(parentFromWbs(wbs)) || ""
             : sanitizeString(col(r, "Parent ID", "parentId", "parent_id"), 20);
           const effortHours = isEdrawSchedule
             ? parseDurationHours(col(r, "Duration", "Duração", "Duracao"))
@@ -631,7 +717,7 @@ app.post("/api/import-excel", requireAuth, requireReplaceAllImportAccess, upload
               wbs,
               isEdrawSchedule ? outlineLevelFromWbs(wbs) : sanitizeInt(col(r, "Outline Level", "outlineLevel"), 1),
               isEdrawSchedule ? sanitizeInt(externalId, index + 1) : sanitizeInt(col(r, "Sort Order", "sortOrder"), index + 1),
-              isEdrawSchedule ? cleanTaskName(col(data[0], "Task", "Tarefa")) : sanitizeString(col(r, "Projeto", "projeto"), 200),
+              isEdrawSchedule ? scheduleProjectName : sanitizeString(col(r, "Projeto", "projeto"), 200),
               isEdrawSchedule ? cleanTaskName(col(r, "Task", "Tarefa")) : sanitizeString(col(r, "Tarefa", "tarefa"), 500),
               isEdrawSchedule ? "" : sanitizeString(col(r, "Sub-tarefa", "subtarefa", "Subtarefa"), 500),
               isEdrawSchedule ? sanitizeString(col(r, "Resources", "Recursos", "Responsável", "Responsavel"), 500) : sanitizeString(col(r, "Responsável", "responsavel", "Responsavel"), 500),
@@ -674,25 +760,61 @@ app.post("/api/import-excel", requireAuth, requireReplaceAllImportAccess, upload
       }
 
       const recursoSheet = workbook.getWorksheet("Recurso") || workbook.getWorksheet("Recursos") || findSheetByColumns(workbook, "Name", "Max Units", "Type");
-      if (recursoSheet) {
-        const data = sheetToObjects(recursoSheet);
+      if (recursoSheet || isScheduleImport) {
+        const hasResourceSheet = !!recursoSheet;
+        let data = recursoSheet ? sheetToObjects(recursoSheet) : [];
+        if (isScheduleImport && !data.length) {
+          const names = new Set();
+          edrawScheduleRows.forEach((row) => {
+            sanitizeString(col(row, "Resources", "Recursos", "Responsável", "Responsavel"), 500)
+              .split(";")
+              .map((item) => item.trim())
+              .filter(Boolean)
+              .forEach((item) => names.add(item));
+          });
+          data = Array.from(names).map((name) => ({ Name: name }));
+        }
         if (data.length > MAX_ROWS) throw new Error(`Limite de ${MAX_ROWS} linhas excedido na aba Recurso`);
-        await conn.query("DELETE FROM recursos");
+        if (!isScheduleImport) {
+          await conn.query("DELETE FROM recursos");
+        }
         for (const r of data) {
-          await conn.query(
-            `INSERT INTO recursos (external_id, nome, funcao, resource_type, max_units, standard_rate, overtime_rate, email) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-            [
-              sanitizeString(col(r, "ID", "id"), 50),
-              sanitizeString(col(r, "Nome", "nome", "Name"), 200),
-              sanitizeString(col(r, "Função", "funcao", "Funcao", "Group", "Type"), 200),
-              sanitizeString(col(r, "Type", "resourceType"), 50).toLowerCase().includes("people") ? "work" : sanitizeString(col(r, "Type", "resourceType"), 50),
-              sanitizeNumber(col(r, "Max Units", "maxUnits"), 1),
-              sanitizeNumber(col(r, "Standard Rate", "standardRate", "Cost Per")),
-              sanitizeNumber(col(r, "Overtime Rate", "overtimeRate")),
-              sanitizeString(col(r, "E-Mail", "Email", "email"), 200),
-            ]
-          );
-          imported.recursos++;
+          const nome = sanitizeString(col(r, "Nome", "nome", "Name"), 200);
+          const values = [
+            sanitizeString(col(r, "ID", "id"), 50),
+            nome,
+            sanitizeString(col(r, "Função", "funcao", "Funcao", "Group", "Type"), 200),
+            sanitizeString(col(r, "Type", "resourceType"), 50).toLowerCase().includes("people") ? "work" : sanitizeString(col(r, "Type", "resourceType"), 50),
+            sanitizeNumber(col(r, "Max Units", "maxUnits"), 1),
+            sanitizeNumber(col(r, "Standard Rate", "standardRate", "Cost Per")),
+            sanitizeNumber(col(r, "Overtime Rate", "overtimeRate")),
+            sanitizeString(col(r, "E-Mail", "Email", "email"), 200),
+          ];
+          if (isScheduleImport) {
+            if (!nome) continue;
+            const [existingResources] = await conn.query("SELECT id FROM recursos WHERE nome = ? LIMIT 1", [nome]);
+            if (existingResources.length) {
+              if (hasResourceSheet) {
+                await conn.query(
+                  `UPDATE recursos SET external_id=?, funcao=?, resource_type=?, max_units=?, standard_rate=?, overtime_rate=?, email=? WHERE id=?`,
+                  [values[0], values[2], values[3], values[4], values[5], values[6], values[7], existingResources[0].id]
+                );
+              }
+              imported.recursos++;
+            } else {
+              await conn.query(
+                `INSERT INTO recursos (external_id, nome, funcao, resource_type, max_units, standard_rate, overtime_rate, email) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+                values
+              );
+              imported.recursos++;
+            }
+          } else {
+            await conn.query(
+              `INSERT INTO recursos (external_id, nome, funcao, resource_type, max_units, standard_rate, overtime_rate, email) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+              values
+            );
+            imported.recursos++;
+          }
         }
       }
 
@@ -705,6 +827,7 @@ app.post("/api/import-excel", requireAuth, requireReplaceAllImportAccess, upload
           if (projeto) projetosSet.add(projeto);
         });
       }
+      if (scheduleProjectName) projetosSet.add(scheduleProjectName);
       for (const projeto of projetosSet) {
         await syncProjectMetrics(pool, projeto);
       }
@@ -719,7 +842,7 @@ app.post("/api/import-excel", requireAuth, requireReplaceAllImportAccess, upload
         after: {
           imported,
           file: fileMetadata,
-          importMode: "replace_all",
+          importMode: isScheduleImport ? "replace_project" : "replace_all",
         },
       });
       res.json({ success: true, imported });

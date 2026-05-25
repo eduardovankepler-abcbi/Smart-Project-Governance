@@ -78,6 +78,7 @@ export interface ProjectTemplate {
 export const AUTH_TOKEN_STORAGE_KEY = "abc_pm_auth_token";
 const IMPORT_CONFIRMATION_PHRASES = {
   excel: "SUBSTITUIR TUDO",
+  schedule: "SUBSTITUIR CRONOGRAMA",
   msProject: "SUBSTITUIR CRONOGRAMA",
 } as const;
 
@@ -452,12 +453,16 @@ export async function deleteRecurso(id: number): Promise<void> {
 }
 
 // ===== IMPORT & HEALTH =====
-export async function importExcel(file: File): Promise<{ success: boolean; imported: { projetos: number; tarefas: number; recursos: number } }> {
+export async function importExcel(
+  file: File,
+  options: { mode?: "replace_all" | "replace_project" } = {}
+): Promise<{ success: boolean; imported: { projetos: number; tarefas: number; recursos: number } }> {
   if (!isApiEnabled()) throw new Error("API não configurada. Defina VITE_API_URL no .env");
+  const mode = options.mode || "replace_all";
   const formData = new FormData();
   formData.append("file", file);
-  formData.append("importMode", "replace_all");
-  formData.append("confirmationText", IMPORT_CONFIRMATION_PHRASES.excel);
+  formData.append("importMode", mode);
+  formData.append("confirmationText", mode === "replace_project" ? IMPORT_CONFIRMATION_PHRASES.schedule : IMPORT_CONFIRMATION_PHRASES.excel);
   const authToken = getStoredToken();
   const res = await fetch(`${API_BASE_URL}/api/import-excel`, {
     method: "POST",
