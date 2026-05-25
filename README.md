@@ -269,6 +269,14 @@ Fluxo recomendado:
 4. em caso de rebuild completo, recriar o banco e reaplicar `schema.sql`
 5. depois religar o sync com Supabase
 
+## Operação em nuvem
+
+Veja [OPERATIONS.md](./OPERATIONS.md) para:
+
+- endurecimento SSL do Aiven com `DB_SSL_MODE=verify_ca`
+- backup lógico do MySQL Aiven com `scripts/backup-aiven-mysql.ps1`
+- cuidados de restore em produção
+
 ## Observações operacionais
 
 - o frontend continua funcionando com dados locais se `VITE_API_URL` não estiver definido

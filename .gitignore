@@ -21,6 +21,9 @@ server/.env*
 !server/.env.*.example
 uploads/
 server/uploads/
+backups/
+*.sql
+*.sql.gz
 
 # Editor directories and files
 .vscode/*
