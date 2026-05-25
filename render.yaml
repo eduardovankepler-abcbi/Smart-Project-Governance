@@ -23,7 +23,7 @@ services:
       - key: DB_NAME
         sync: false
       - key: DB_SSL_MODE
-        value: disabled
+        value: required
       - key: DB_SSL_CA
         sync: false
       - key: API_KEY

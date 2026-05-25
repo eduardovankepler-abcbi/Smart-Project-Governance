@@ -6,7 +6,7 @@ Este projeto ja esta preparado para subir o backend na Render como `Web Service`
 
 1. manter o frontend na Vercel
 2. subir apenas o backend na Render
-3. usar um MySQL externo ou rodar uma instancia propria de MySQL/MariaDB na Render
+3. usar o MySQL gerenciado no Aiven
 
 ## O que ja esta configurado
 
@@ -24,9 +24,9 @@ O comando `npm run start:prod`:
 - executa as migracoes versionadas
 - sobe a API
 
-## Opcao A: subir so o backend agora
+## Opcao A: subir o backend na Render usando MySQL Aiven
 
-Use esta opcao se o MySQL atual ainda continuar disponivel por mais algum tempo.
+Use esta opcao como caminho principal deste projeto.
 
 ### Variaveis obrigatorias
 
@@ -37,8 +37,8 @@ DB_HOST=...
 DB_PORT=3306
 DB_USER=...
 DB_PASSWORD=...
-DB_NAME=...
-DB_SSL_MODE=disabled
+DB_NAME=abc_project_manager_v2
+DB_SSL_MODE=required
 DB_SSL_CA=
 API_KEY=...
 ENABLE_GLOBAL_API_KEY=false
@@ -64,6 +64,13 @@ Quando o deploy concluir, valide:
 https://SEU_BACKEND.onrender.com/api/health
 ```
 
+Depois do primeiro health check, troque para verificacao completa de certificado se quiser endurecer a conexao:
+
+```env
+DB_SSL_MODE=verify_ca
+DB_SSL_CA=COLE_AQUI_O_CA_CERTIFICATE_DA_AIVEN
+```
+
 ## Opcao B: migrar backend e banco para a Render
 
 Se o MySQL da Railway tambem vai expirar, o caminho mais limpo e migrar o banco tambem.
@@ -80,7 +87,7 @@ A documentacao oficial da Render confirma suporte a bancos proprios com disco pe
 4. fazer o health check
 5. atualizar a Vercel com a nova URL da API
 
-## Opcao C: MySQL na Aiven
+## Referencia: MySQL na Aiven
 
 Se voce ja tem um projeto na Aiven, esta e uma boa opcao para o periodo de testes e validacao. Ela tira o backend da Render da dependencia do MySQL da Railway.
 

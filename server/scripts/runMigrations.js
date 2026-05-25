@@ -17,7 +17,7 @@ if (optionalEnvPath) {
 }
 
 function isAllowedBootstrapDatabase(databaseName) {
-  return /^(smart_project_governance|abc_project_manager)$/i.test(databaseName || "");
+  return /^(smart_project_governance|abc_project_manager|abc_project_manager_v2)$/i.test(databaseName || "");
 }
 
 function normalizeBaseSchemaForManagedMysql(schemaSql) {
@@ -73,7 +73,7 @@ async function dropExistingBootstrapTables(connection) {
   } else {
     throw new Error(
       `Refusing to bootstrap unexpected database "${databaseName}". ` +
-        "Set DB_NAME to smart_project_governance before deploying."
+        "Set DB_NAME to smart_project_governance or abc_project_manager_v2 before deploying."
     );
   }
 

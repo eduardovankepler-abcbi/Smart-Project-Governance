@@ -8,11 +8,11 @@ O frontend pode continuar na Vercel. Para remover a dependencia da maquina local
 
 ## Caminho recomendado
 
-Para este projeto, o caminho mais simples e coerente com a arquitetura atual e:
+Para este projeto, como o MySQL ja esta no Aiven, o caminho mais simples e coerente com a arquitetura atual e:
 
 1. frontend na Vercel
 2. backend no Render como Web Service Node
-3. MySQL gerenciado em provedor compativel
+3. MySQL gerenciado no Aiven
 
 Se depois voce optar por VPS, o mesmo backend continua valido.
 
@@ -48,7 +48,9 @@ DB_HOST=...
 DB_PORT=3306
 DB_USER=...
 DB_PASSWORD=...
-DB_NAME=...
+DB_NAME=abc_project_manager_v2
+DB_SSL_MODE=required
+DB_SSL_CA=
 API_KEY=...
 CORS_ORIGINS=https://SEU_FRONTEND.vercel.app
 IMPORT_MAX_FILE_SIZE_MB=25
@@ -57,11 +59,12 @@ SUPABASE_SYNC_ENABLED=false
 
 ## Banco
 
-O app usa MySQL. Para um ambiente estavel em nuvem:
+O app usa MySQL. Como o banco esta no Aiven:
 
-1. crie um banco MySQL permanente
-2. importe a estrutura inicial
-3. aponte as variaveis `DB_*` do backend para esse banco
+1. pegue `host`, `port`, `user`, `password` e `database` em `Connection information`
+2. use esses dados nas variaveis `DB_*` do backend no Render
+3. comece com `DB_SSL_MODE=required`
+4. depois da validacao inicial, prefira `DB_SSL_MODE=verify_ca` com o CA certificate em `DB_SSL_CA`
 
 ### Opcao mais segura para carga inicial
 
