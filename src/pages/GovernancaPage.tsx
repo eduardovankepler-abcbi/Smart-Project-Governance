@@ -11,7 +11,8 @@ import type { UserAccount } from "@/types/auth";
 import UserDialog from "@/components/UserDialog";
 import DeleteDialog from "@/components/DeleteDialog";
 import ResetUserPasswordDialog from "@/components/ResetUserPasswordDialog";
-import { Plus, Pencil, Trash2, Shield, Users, KeyRound } from "lucide-react";
+import ExcelImport from "@/components/ExcelImport";
+import { Plus, Pencil, Trash2, Shield, Users, KeyRound, Database } from "lucide-react";
 
 export default function GovernancaPage() {
   const { toast } = useToast();
@@ -111,6 +112,21 @@ export default function GovernancaPage() {
             </CardContent>
           </Card>
         </div>
+
+        {currentUser?.role === "admin" ? (
+          <Card className="border border-warning/30">
+            <CardContent className="p-5 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+              <div className="flex items-start gap-3">
+                <Database className="mt-0.5 text-warning" size={18} />
+                <div>
+                  <p className="text-sm font-semibold text-foreground">Importação administrativa completa</p>
+                  <p className="text-sm text-muted-foreground">Substitui dados em lote a partir do Excel legado com abas Projeto, Tarefa e Recurso.</p>
+                </div>
+              </div>
+              <ExcelImport mode="adminFull" />
+            </CardContent>
+          </Card>
+        ) : null}
 
         <Card className="border border-border">
           <CardContent className="p-5 space-y-4">

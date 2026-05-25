@@ -15,6 +15,7 @@ dist-ssr
 .env.*
 !.env.example
 !.env.*.example
+.secrets/
 server/.env
 server/.env*
 !server/.env.example

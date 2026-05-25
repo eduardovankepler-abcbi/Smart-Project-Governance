@@ -14,13 +14,15 @@ import * as api from "@/services/api";
 const MAX_IMPORT_SIZE_MB = 25;
 const MAX_IMPORT_SIZE_BYTES = MAX_IMPORT_SIZE_MB * 1024 * 1024;
 const IMPORT_CONFIRMATION_PHRASES = {
-  excel: "SUBSTITUIR CRONOGRAMA",
+  schedule: "SUBSTITUIR CRONOGRAMA",
+  adminFull: "SUBSTITUIR TUDO",
   xml: "SUBSTITUIR CRONOGRAMA",
 } as const;
 
 type PendingImportKind = "excel" | "xml";
+type ExcelImportMode = "schedule" | "adminFull";
 
-export default function ExcelImport() {
+export default function ExcelImport({ mode = "schedule" }: { mode?: ExcelImportMode }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [loading, setLoading] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -30,6 +32,9 @@ export default function ExcelImport() {
   const { toast } = useToast();
   const { user } = useAuth();
   const { setProjetos, setTarefas, setRecursos, refreshAll } = useData();
+  const isAdminFull = mode === "adminFull";
+  const accept = isAdminFull ? ".xlsx,.xlsm" : ".xlsx,.xlsm,.xml";
+  const buttonLabel = isAdminFull ? "Importação completa" : "Importar Cronograma";
 
   const resetSelection = () => {
     setPendingFile(null);
@@ -51,10 +56,10 @@ export default function ExcelImport() {
             description: `${result.imported.project}: ${result.imported.tarefas} tarefas e ${result.imported.recursos} recursos`,
           });
         } else {
-          const result = await api.importExcel(file, { mode: "replace_project" });
+          const result = await api.importExcel(file, { mode: isAdminFull ? "replace_all" : "replace_project" });
           await refreshAll();
           toast({
-            title: "Importação concluída",
+            title: isAdminFull ? "Importação administrativa concluída" : "Cronograma importado",
             description: `Importados: ${result.imported.projetos} projetos, ${result.imported.tarefas} tarefas, ${result.imported.recursos} recursos`,
           });
         }
@@ -98,10 +103,11 @@ export default function ExcelImport() {
     if (!file) return;
 
     const ext = file.name.split(".").pop()?.toLowerCase();
-    if (!["xlsx", "xlsm", "xml"].includes(ext || "")) {
+    const allowedExtensions = isAdminFull ? ["xlsx", "xlsm"] : ["xlsx", "xlsm", "xml"];
+    if (!allowedExtensions.includes(ext || "")) {
       toast({
         title: "Formato inválido",
-        description: "Selecione um arquivo .xlsx, .xlsm ou .xml",
+        description: isAdminFull ? "Selecione um arquivo .xlsx ou .xlsm" : "Selecione um arquivo .xlsx, .xlsm ou .xml",
         variant: "destructive",
       });
       resetSelection();
@@ -118,7 +124,7 @@ export default function ExcelImport() {
       return;
     }
 
-    if (ext !== "xml" && isApiEnabled() && user?.role !== "admin") {
+    if (isAdminFull && isApiEnabled() && user?.role !== "admin") {
       toast({
         title: "Importação restrita",
         description: "A importação Excel com substituição total é permitida apenas para administradores.",
@@ -134,7 +140,11 @@ export default function ExcelImport() {
     setConfirmOpen(true);
   };
 
-  const expectedPhrase = pendingImportKind ? IMPORT_CONFIRMATION_PHRASES[pendingImportKind] : "";
+  const expectedPhrase = pendingImportKind
+    ? pendingImportKind === "xml"
+      ? IMPORT_CONFIRMATION_PHRASES.xml
+      : IMPORT_CONFIRMATION_PHRASES[mode]
+    : "";
   const canConfirm = !!pendingFile && !!pendingImportKind && confirmationText.trim().toUpperCase() === expectedPhrase;
 
   const handleConfirmImport = async () => {
@@ -147,7 +157,7 @@ export default function ExcelImport() {
       <input
         ref={inputRef}
         type="file"
-        accept=".xlsx,.xlsm,.xml"
+        accept={accept}
         onChange={handleFile}
         className="hidden"
       />
@@ -159,7 +169,7 @@ export default function ExcelImport() {
         className="gap-1.5"
       >
         {loading ? <Loader2 size={14} className="animate-spin" /> : <Upload size={14} />}
-        Importar Cronograma
+        {buttonLabel}
       </Button>
 
       <Dialog
@@ -171,14 +181,16 @@ export default function ExcelImport() {
       >
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
-            <DialogTitle>Confirmar importação destrutiva</DialogTitle>
+            <DialogTitle>{isAdminFull ? "Confirmar importação administrativa" : "Confirmar importação de cronograma"}</DialogTitle>
           </DialogHeader>
 
           <div className="space-y-4">
             <p className="text-sm text-muted-foreground">
               {pendingImportKind === "xml"
                 ? "Esta importação substituirá o cronograma existente do projeto encontrado no XML, incluindo tarefas, vínculos e alocações relacionadas."
-                : "Esta importação Excel substituirá apenas o cronograma do projeto encontrado no arquivo, preservando os demais projetos do ambiente."}
+                : isAdminFull
+                  ? "Esta importação substituirá em lote os dados importáveis do ambiente, incluindo projetos, tarefas, dependências, alocações e recursos."
+                  : "Esta importação Excel substituirá apenas o cronograma do projeto encontrado no arquivo, preservando os demais projetos do ambiente."}
             </p>
 
             <div className="rounded-lg border border-warning/30 bg-warning/10 p-3 text-sm text-foreground">
