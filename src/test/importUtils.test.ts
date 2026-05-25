@@ -57,4 +57,45 @@ describe("parseExcelFile", () => {
       status: "Em andamento",
     });
   });
+
+  it("imports EdrawProj exports with schedule on Sheet1 and headers on row 2", async () => {
+    const workbook = new ExcelJS.Workbook();
+    const schedule = workbook.addWorksheet("Sheet1");
+    schedule.addRow(["EdrawProj", "", "", "", "", "", "", "", "", ""]);
+    schedule.addRow(["ID", "WBS", "Predecessors", "Task", "Start", "Finish", "Duration", "Status", "Progress", "Resources", "ActualStart", "ActualFinish"]);
+    schedule.addRow([1, "1", "", "GESTÃO DE OBRAS - UPGRADE", "2026-04-29", "2026-06-12", "209Hour", "Delayed", "4.4%", "Flávio; Eduardo M.", "", ""]);
+    schedule.addRow([2, "1.1", "", "1.1 -> Levantamento de Requisitos", "2026-04-29", "2026-04-30", "16Hour", "Completed", "100%", "Flávio", "2026-04-29", "2026-04-30"]);
+    schedule.addRow([3, "1.2", "2FS", "MENU CONFIGURAÇÕES GERAIS", "2026-05-11", "2026-05-13", "23Hour", "Delayed", "0%", "Eduardo M.", "", ""]);
+
+    const resources = workbook.addWorksheet("Sheet2");
+    resources.addRow(["ID", "Name", "Max Units", "Type", "Standard Rate", "Overtime Rate", "Cost Per", "Group", "E-Mail", "Notes"]);
+    resources.addRow([1, "Flávio", "100%", "People", "85Hour", "0Hour", 85, "FULL STACK", "", ""]);
+    resources.addRow([2, "Eduardo M.", "100%", "People", "18.19Hour", "0Hour", 18.19, "BACK-END", "", ""]);
+
+    const result = await parseExcelFile(await workbookToFile(workbook, "Gestão de Obras - Upgrade.xlsx"));
+
+    expect(result.counts).toEqual({ projetos: 1, tarefas: 3, recursos: 2 });
+    expect(result.projetos?.[0]).toMatchObject({
+      projeto: "GESTÃO DE OBRAS - UPGRADE",
+      totalTarefas: 3,
+      tarefasConcluidas: 1,
+      tarefasAtrasadas: 2,
+    });
+    expect(result.tarefas?.[1]).toMatchObject({
+      id: "1.1",
+      externalId: "2",
+      parentId: "1",
+      tarefa: "Levantamento de Requisitos",
+      dataInicioPlanej: "4/29/26",
+      dataFimPlanej: "4/30/26",
+      esforcoPlanej: 16,
+      percentual: 100,
+      status: "Concluído",
+    });
+    expect(result.tarefas?.[2].predecessors?.[0]).toMatchObject({
+      predecessorTaskId: "1.1",
+      type: "FS",
+    });
+    expect(result.recursos?.map(resource => resource.nome)).toEqual(["Flávio", "Eduardo M."]);
+  });
 });

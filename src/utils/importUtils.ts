@@ -41,6 +41,22 @@ function formatDate(date: Date): string {
   return `${date.getMonth() + 1}/${date.getDate()}/${date.getFullYear().toString().slice(-2)}`;
 }
 
+function dateStr(val: unknown): string {
+  const unwrapped = unwrapCellValue(val);
+  if (!unwrapped) return "";
+  if (unwrapped instanceof Date) return formatDate(unwrapped);
+  if (typeof unwrapped === "number" && unwrapped > 1 && unwrapped < 200000) {
+    const epoch = new Date(Date.UTC(1899, 11, 30));
+    return formatDate(new Date(epoch.getTime() + unwrapped * 86400000));
+  }
+  const raw = String(unwrapped).trim();
+  const iso = raw.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+  if (iso) {
+    return `${Number(iso[2])}/${Number(iso[3])}/${iso[1].slice(-2)}`;
+  }
+  return raw.slice(0, 20);
+}
+
 function unwrapCellValue(val: unknown): unknown {
   if (val == null) return "";
   if (val instanceof Date) return val;
@@ -181,6 +197,194 @@ function col(row: Record<string, unknown>, ...keys: string[]): unknown {
   return undefined;
 }
 
+function hasColumns(row: Record<string, unknown> | undefined, ...keys: string[]): boolean {
+  if (!row) return false;
+  return keys.every(key => col(row, key) !== undefined);
+}
+
+function findSheetByColumns(workbook: ExcelJS.Workbook, ...keys: string[]): ExcelJS.Worksheet | undefined {
+  let found: ExcelJS.Worksheet | undefined;
+  workbook.eachSheet((sheet) => {
+    if (found) return;
+    const rows = sheetToObjects(sheet);
+    if (hasColumns(rows[0], ...keys)) found = sheet;
+  });
+  return found;
+}
+
+function cleanTaskName(value: unknown): string {
+  return str(value, 500).replace(/^\s*\d+(?:\.\d+)*\s*->\s*/, "").trim();
+}
+
+function parentFromWbs(wbs: string): string {
+  const parts = String(wbs || "").split(".").filter(Boolean);
+  return parts.length > 1 ? parts.slice(0, -1).join(".") : "";
+}
+
+function outlineLevelFromWbs(wbs: string): number {
+  return String(wbs || "").split(".").filter(Boolean).length || 1;
+}
+
+function parseDurationHours(value: unknown): number {
+  const raw = str(value, 50);
+  if (!raw) return 0;
+  const n = num(raw);
+  if (/day/i.test(raw)) return n * 8;
+  if (/min/i.test(raw)) return n / 60;
+  return n;
+}
+
+function mapScheduleStatus(value: unknown, progress = 0): string {
+  const raw = normalize(str(value, 50));
+  if (raw.includes("complete") || raw.includes("concluido")) return "Concluído";
+  if (raw.includes("delay") || raw.includes("atras")) return "Atrasado";
+  if (raw.includes("not started") || raw.includes("nao iniciado")) return "Não iniciado";
+  if (raw.includes("progress") || raw.includes("andamento")) return "Em andamento";
+  if (progress >= 100) return "Concluído";
+  if (progress > 0) return "Em andamento";
+  return "Não iniciado";
+}
+
+function buildProjectCode(projectName: string): string {
+  return `PRJ-${projectName
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toUpperCase()
+    .replace(/[^A-Z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 40) || Date.now()}`;
+}
+
+function parseEdrawSchedule(workbook: ExcelJS.Workbook, file: File): ImportResult | null {
+  const scheduleSheet = findSheetByColumns(workbook, "ID", "WBS", "Task", "Start", "Finish");
+  if (!scheduleSheet) return null;
+
+  const scheduleRows = sheetToObjects(scheduleSheet);
+  if (!scheduleRows.length) return null;
+
+  const rootRow = scheduleRows[0];
+  const projectName = cleanTaskName(col(rootRow, "Task", "Tarefa")) || file.name.replace(/\.(xlsx|xlsm)$/i, "");
+
+  const externalIdToWbs = new Map<string, string>();
+  scheduleRows.forEach((row, index) => {
+    const wbs = str(col(row, "WBS", "wbs"), 50) || str(col(row, "ID", "id"), 20) || String(index + 1);
+    const externalId = str(col(row, "ID", "id"), 50) || String(index + 1);
+    externalIdToWbs.set(externalId, wbs);
+  });
+
+  const tarefas: Tarefa[] = scheduleRows.map((row, index) => {
+    const wbs = str(col(row, "WBS", "wbs"), 50) || str(col(row, "ID", "id"), 20) || String(index + 1);
+    const externalId = str(col(row, "ID", "id"), 50) || String(index + 1);
+    const effortHours = parseDurationHours(col(row, "Duration", "Duração", "Duracao"));
+    const percentual = num(col(row, "Progress", "% Concluído", "% Concluido", "percentual"));
+    const status = mapScheduleStatus(col(row, "Status"), percentual);
+    const start = dateStr(col(row, "Start", "Início", "Inicio", "Data Início Planejado"));
+    const finish = dateStr(col(row, "Finish", "Fim", "Data Fim Planejado"));
+    const actualStart = dateStr(col(row, "ActualStart", "Actual Start", "Data Início Real"));
+    const actualFinish = dateStr(col(row, "ActualFinish", "Actual Finish", "Data Fim Real"));
+    const diasPlanejados = Math.max(Math.round(effortHours / 8), 0);
+
+    return {
+      id: wbs,
+      externalId,
+      parentId: parentFromWbs(wbs),
+      wbs,
+      outlineLevel: outlineLevelFromWbs(wbs),
+      sortOrder: int(externalId, index + 1),
+      projeto: projectName,
+      tarefa: cleanTaskName(col(row, "Task", "Tarefa")) || `Tarefa ${externalId}`,
+      subtarefa: "",
+      responsavel: str(col(row, "Resources", "Recursos", "Responsável", "Responsavel"), 500),
+      funcao: "",
+      dataInicioPlanej: start,
+      esforcoPlanej: effortHours,
+      dataFimPlanej: finish,
+      dataInicioReal: actualStart,
+      esforcoReal: actualStart || actualFinish ? effortHours * (percentual / 100) : 0,
+      dataFimReal: actualFinish,
+      percentual,
+      status,
+      durationMinutes: Math.round(effortHours * 60),
+      valorPrevisto: 0,
+      valorGasto: 0,
+      diasPlanejados,
+      diasReal: diasPlanejados,
+      diasCompletados: Math.round(diasPlanejados * (percentual / 100)),
+      predecessors: parsePredecessors(str(col(row, "Predecessors", "Predecessoras"), 200), externalIdToWbs),
+    };
+  });
+
+  const resourceSheet = findSheetByColumns(workbook, "Name", "Max Units", "Type");
+  let recursos: Recurso[] = [];
+  if (resourceSheet) {
+    recursos = sheetToObjects(resourceSheet)
+      .map(row => ({
+        externalId: str(col(row, "ID", "id"), 50),
+        nome: str(col(row, "Name", "Nome"), 200),
+        funcao: str(col(row, "Group", "Função", "Funcao", "Type"), 200),
+        resourceType: str(col(row, "Type"), 50).toLowerCase().includes("people") ? "work" : str(col(row, "Type"), 50),
+        maxUnits: num(col(row, "Max Units", "MaxUnits"), 1),
+        standardRate: num(col(row, "Standard Rate", "Cost Per")),
+        overtimeRate: num(col(row, "Overtime Rate")),
+        email: str(col(row, "E-Mail", "Email"), 200),
+      }))
+      .filter(resource => resource.nome);
+  }
+
+  if (!recursos.length) {
+    const names = new Set<string>();
+    tarefas.forEach(task => task.responsavel.split(";").map(name => name.trim()).filter(Boolean).forEach(name => names.add(name)));
+    recursos = Array.from(names).sort().map(nome => ({ nome, funcao: "" }));
+  }
+
+  const conclusao = tarefas.length ? Math.round(tarefas.reduce((sum, task) => sum + task.percentual, 0) / tarefas.length) : 0;
+  const projeto: Projeto = {
+    id: 1,
+    projectId: buildProjectCode(projectName),
+    projeto: projectName,
+    descricao: `Importado de ${file.name}`,
+    prioridade: "2- Média",
+    responsavel: tarefas[0]?.responsavel || "",
+    ftes: recursos.length,
+    valorPrevisto: 0,
+    valorGasto: 0,
+    dataInicioPlanej: tarefas[0]?.dataInicioPlanej || "",
+    dataFimPlanej: tarefas[0]?.dataFimPlanej || "",
+    dataInicio: tarefas[0]?.dataInicioPlanej || "",
+    dataFimReal: "",
+    totalTarefas: tarefas.length,
+    tarefasConcluidas: tarefas.filter(task => task.status === "Concluído").length,
+    tarefasAndamento: tarefas.filter(task => task.status === "Em andamento").length,
+    tarefasAtrasadas: tarefas.filter(task => task.status === "Atrasado").length,
+    tarefasNaoIniciadas: tarefas.filter(task => task.status === "Não iniciado").length,
+    status: mapScheduleStatus(tarefas[0]?.status, conclusao),
+    conclusao,
+  };
+
+  return {
+    projetos: [projeto],
+    tarefas,
+    recursos,
+    counts: { projetos: 1, tarefas: tarefas.length, recursos: recursos.length },
+  };
+}
+
+function parsePredecessors(value: string, externalIdToTaskId = new Map<string, string>()): Tarefa["predecessors"] {
+  return String(value || "")
+    .split(";")
+    .map(item => item.trim())
+    .filter(Boolean)
+    .map(item => {
+      const match = item.match(/^(.+?)(FS|SS|FF|SF)?$/i);
+      const rawId = match?.[1]?.trim() || item;
+      return {
+        predecessorTaskId: externalIdToTaskId.get(rawId) || rawId,
+        type: (match?.[2]?.toUpperCase() || "FS") as string,
+        lagMinutes: 0,
+      };
+    });
+}
+
 export interface ImportResult {
   projetos?: Projeto[];
   tarefas?: Tarefa[];
@@ -265,6 +469,11 @@ export async function parseExcelFile(file: File): Promise<ImportResult> {
       funcao: str(col(r, "Função", "funcao"), 200),
     }));
     result.counts.recursos = result.recursos.length;
+  }
+
+  if (!result.counts.projetos && !result.counts.tarefas && !result.counts.recursos) {
+    const edrawResult = parseEdrawSchedule(workbook, file);
+    if (edrawResult) return edrawResult;
   }
 
   return result;
