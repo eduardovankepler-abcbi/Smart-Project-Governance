@@ -96,7 +96,10 @@ test("MS Project preview scopes replacement to existing XML project", async () =
     if (sql === "SELECT COUNT(*) AS total FROM projetos") return [[{ total: 4 }]];
     if (sql.includes("FROM task_assignments")) return [[{ total: 6 }]];
     if (sql.includes("FROM task_dependencies")) return [[{ total: 3 }]];
-    if (sql.includes("FROM tarefas WHERE projeto = ?")) return [[{ total: 18 }]];
+    if (sql.includes("FROM tarefas WHERE projeto_id = ? OR projeto = ?")) {
+      assert.deepEqual(params, [77, "PROJETO XML"]);
+      return [[{ total: 18 }]];
+    }
     if (sql.includes("SELECT nome FROM recursos WHERE nome IN")) {
       assert.deepEqual(params, [["Maria", "Joao"]]);
       return [[{ nome: "Maria" }]];
@@ -127,12 +130,15 @@ test("MS Project preview scopes replacement to existing XML project", async () =
 
 test("MS Project preview reports new project creation", async () => {
   const parsed = parseMsProjectXml(buildSampleXml("NOVO XML"));
-  const conn = createConn(async (sql) => {
+  const conn = createConn(async (sql, params) => {
     if (sql.includes("SELECT id FROM projetos WHERE projeto = ?")) return [[]];
     if (sql === "SELECT COUNT(*) AS total FROM projetos") return [[{ total: 4 }]];
     if (sql.includes("FROM task_assignments")) return [[{ total: 0 }]];
     if (sql.includes("FROM task_dependencies")) return [[{ total: 0 }]];
-    if (sql.includes("FROM tarefas WHERE projeto = ?")) return [[{ total: 0 }]];
+    if (sql.includes("FROM tarefas WHERE projeto_id = ? OR projeto = ?")) {
+      assert.deepEqual(params, [0, "NOVO XML"]);
+      return [[{ total: 0 }]];
+    }
     if (sql.includes("SELECT nome FROM recursos WHERE nome IN")) return [[]];
     throw new Error(`Unexpected SQL: ${sql}`);
   });

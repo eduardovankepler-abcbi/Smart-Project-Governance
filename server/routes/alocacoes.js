@@ -18,15 +18,17 @@ async function syncTaskAssignmentState(pool, supabaseSync, taskId) {
 }
 
 module.exports = function (pool, auth) {
-  const { requireAuth, requireWriteAccess, getAccessibleProjectNamesFilter } = auth;
+  const { requireAuth, requireWriteAccess, getAccessibleProjectNamesFilter, getAccessibleProjectIdsFilter } = auth;
   const supabaseSync = require("../utils/supabaseSync");
 
   async function canWriteTask(req, taskId) {
     if (req.authUser.role === "admin") return true;
-    const [taskRows] = await pool.query("SELECT projeto FROM tarefas WHERE id = ?", [taskId]);
+    const [taskRows] = await pool.query("SELECT projeto, projeto_id FROM tarefas WHERE id = ?", [taskId]);
     if (!taskRows.length) return false;
-    const access = await getAccessibleProjectNamesFilter(req.authUser);
-    return access.projectNames.includes(taskRows[0].projeto);
+    const idAccess = await getAccessibleProjectIdsFilter(req.authUser);
+    if (taskRows[0].projeto_id && idAccess.projectIds.includes(Number(taskRows[0].projeto_id))) return true;
+    const nameAccess = await getAccessibleProjectNamesFilter(req.authUser);
+    return nameAccess.projectNames.includes(taskRows[0].projeto);
   }
 
   router.get("/", requireAuth, async (req, res) => {
@@ -44,9 +46,13 @@ module.exports = function (pool, auth) {
         query += " WHERE ta.resource_id = ? ";
         params = [req.authUser.linkedResourceId];
       } else if (req.authUser.role === "pmo") {
-        const access = await getAccessibleProjectNamesFilter(req.authUser);
-        query += " WHERE t.projeto IN (?) ";
-        params = [access.projectNames.length ? access.projectNames : ["__none__"]];
+        const idAccess = await getAccessibleProjectIdsFilter(req.authUser);
+        const nameAccess = await getAccessibleProjectNamesFilter(req.authUser);
+        query += " WHERE t.projeto_id IN (?) OR t.projeto IN (?) ";
+        params = [
+          idAccess.projectIds.length ? idAccess.projectIds : [0],
+          nameAccess.projectNames.length ? nameAccess.projectNames : ["__none__"],
+        ];
       }
 
       query += " ORDER BY t.projeto, ta.task_id, ta.id";
@@ -108,8 +114,10 @@ module.exports = function (pool, auth) {
 
       await syncTaskAssignmentState(pool, supabaseSync, taskId);
       const [rows] = await pool.query("SELECT * FROM task_assignments WHERE id = ?", [result.insertId]);
-      const [taskRows] = await pool.query("SELECT projeto, tarefa FROM tarefas WHERE id = ?", [taskId]);
-      const [projectRows] = await pool.query("SELECT id FROM projetos WHERE projeto = ? LIMIT 1", [taskRows[0]?.projeto || ""]);
+      const [taskRows] = await pool.query("SELECT projeto, projeto_id, tarefa FROM tarefas WHERE id = ?", [taskId]);
+      const [projectRows] = taskRows[0]?.projeto_id
+        ? [[{ id: taskRows[0].projeto_id }]]
+        : await pool.query("SELECT id FROM projetos WHERE projeto = ? LIMIT 1", [taskRows[0]?.projeto || ""]);
       await logAudit(pool, {
         actor: req.authUser,
         action: "create",
@@ -173,8 +181,10 @@ module.exports = function (pool, auth) {
 
       await syncTaskAssignmentState(pool, supabaseSync, existingRows[0].task_id);
       const [rows] = await pool.query("SELECT * FROM task_assignments WHERE id = ?", [req.params.id]);
-      const [taskRows] = await pool.query("SELECT projeto, tarefa FROM tarefas WHERE id = ?", [existingRows[0].task_id]);
-      const [projectRows] = await pool.query("SELECT id FROM projetos WHERE projeto = ? LIMIT 1", [taskRows[0]?.projeto || ""]);
+      const [taskRows] = await pool.query("SELECT projeto, projeto_id, tarefa FROM tarefas WHERE id = ?", [existingRows[0].task_id]);
+      const [projectRows] = taskRows[0]?.projeto_id
+        ? [[{ id: taskRows[0].projeto_id }]]
+        : await pool.query("SELECT id FROM projetos WHERE projeto = ? LIMIT 1", [taskRows[0]?.projeto || ""]);
       await logAudit(pool, {
         actor: req.authUser,
         action: "update",
@@ -212,8 +222,10 @@ module.exports = function (pool, auth) {
 
       await pool.query("DELETE FROM task_assignments WHERE id = ?", [req.params.id]);
       await syncTaskAssignmentState(pool, supabaseSync, existingRows[0].task_id);
-      const [taskRows] = await pool.query("SELECT projeto, tarefa FROM tarefas WHERE id = ?", [existingRows[0].task_id]);
-      const [projectRows] = await pool.query("SELECT id FROM projetos WHERE projeto = ? LIMIT 1", [taskRows[0]?.projeto || ""]);
+      const [taskRows] = await pool.query("SELECT projeto, projeto_id, tarefa FROM tarefas WHERE id = ?", [existingRows[0].task_id]);
+      const [projectRows] = taskRows[0]?.projeto_id
+        ? [[{ id: taskRows[0].projeto_id }]]
+        : await pool.query("SELECT id FROM projetos WHERE projeto = ? LIMIT 1", [taskRows[0]?.projeto || ""]);
       await logAudit(pool, {
         actor: req.authUser,
         action: "delete",

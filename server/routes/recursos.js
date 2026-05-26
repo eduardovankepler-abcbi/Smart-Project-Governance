@@ -15,7 +15,7 @@ function stringifySpecialties(value) {
 }
 
 module.exports = function (pool, auth) {
-  const { requireAuth, requireWriteAccess, getAccessibleProjectNamesFilter } = auth;
+  const { requireAuth, requireWriteAccess, getAccessibleProjectNamesFilter, getAccessibleProjectIdsFilter } = auth;
   const { mapRecurso } = require("../utils/mappers");
   const supabaseSync = require("../utils/supabaseSync");
 
@@ -30,15 +30,19 @@ module.exports = function (pool, auth) {
         return res.json(rows.map((row) => ({ ...mapRecurso(row), id: row.id })));
       }
       if (req.authUser.role === "pmo") {
-        const access = await getAccessibleProjectNamesFilter(req.authUser);
+        const idAccess = await getAccessibleProjectIdsFilter(req.authUser);
+        const nameAccess = await getAccessibleProjectNamesFilter(req.authUser);
         const [rows] = await pool.query(
           `SELECT DISTINCT r.*
            FROM recursos r
            INNER JOIN task_assignments ta ON ta.resource_id = r.id
            INNER JOIN tarefas t ON t.id = ta.task_id
-           WHERE t.projeto IN (?)
+           WHERE t.projeto_id IN (?) OR t.projeto IN (?)
            ORDER BY r.nome`,
-          [access.projectNames.length ? access.projectNames : ["__none__"]]
+          [
+            idAccess.projectIds.length ? idAccess.projectIds : [0],
+            nameAccess.projectNames.length ? nameAccess.projectNames : ["__none__"],
+          ]
         );
         return res.json(rows.map((row) => ({ ...mapRecurso(row), id: row.id })));
       }

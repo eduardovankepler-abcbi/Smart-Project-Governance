@@ -26,12 +26,12 @@ async function buildMsProjectImportPreview({
   const projectExists = projectRows.length > 0;
   const existingProjectId = projectRows[0]?.id || null;
   const existingProjectsTotal = await getCount(conn, "SELECT COUNT(*) AS total FROM projetos");
-  const existingTasks = await getCount(conn, "SELECT COUNT(*) AS total FROM tarefas WHERE projeto = ?", [projectName]);
-  const existingAssignments = await getCount(conn, "SELECT COUNT(*) AS total FROM task_assignments WHERE task_id IN (SELECT id FROM tarefas WHERE projeto = ?)", [projectName]);
+  const existingTasks = await getCount(conn, "SELECT COUNT(*) AS total FROM tarefas WHERE projeto_id = ? OR projeto = ?", [existingProjectId || 0, projectName]);
+  const existingAssignments = await getCount(conn, "SELECT COUNT(*) AS total FROM task_assignments WHERE task_id IN (SELECT id FROM tarefas WHERE projeto_id = ? OR projeto = ?)", [existingProjectId || 0, projectName]);
   const existingDependencies = await getCount(
     conn,
-    "SELECT COUNT(*) AS total FROM task_dependencies WHERE task_id IN (SELECT id FROM tarefas WHERE projeto = ?) OR predecessor_task_id IN (SELECT id FROM tarefas WHERE projeto = ?)",
-    [projectName, projectName]
+    "SELECT COUNT(*) AS total FROM task_dependencies WHERE task_id IN (SELECT id FROM tarefas WHERE projeto_id = ? OR projeto = ?) OR predecessor_task_id IN (SELECT id FROM tarefas WHERE projeto_id = ? OR projeto = ?)",
+    [existingProjectId || 0, projectName, existingProjectId || 0, projectName]
   );
   let existingResourceNames = [];
   if (resourceNames.length) {

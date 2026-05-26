@@ -470,7 +470,7 @@ async function getAccessibleProjectIdsFilter(user) {
     const [rows] = await pool.query(
       `SELECT DISTINCT p.id
        FROM projetos p
-       INNER JOIN tarefas t ON t.projeto = p.projeto
+       INNER JOIN tarefas t ON t.projeto_id = p.id OR (t.projeto_id IS NULL AND t.projeto = p.projeto)
        INNER JOIN task_assignments ta ON ta.task_id = t.id
        WHERE ta.resource_id = ?
        ORDER BY p.id`,
@@ -724,14 +724,14 @@ app.post("/api/import-excel", requireAuth, requireImportAccess, upload.single("f
         }
         if (isEdrawSchedule) {
           await conn.query(
-            "DELETE FROM task_assignments WHERE task_id IN (SELECT id FROM tarefas WHERE projeto = ?)",
-            [scheduleProjectName]
+            "DELETE FROM task_assignments WHERE task_id IN (SELECT id FROM tarefas WHERE projeto_id = ? OR projeto = ?)",
+            [scheduleProjectId || 0, scheduleProjectName]
           );
           await conn.query(
-            "DELETE FROM task_dependencies WHERE task_id IN (SELECT id FROM tarefas WHERE projeto = ?) OR predecessor_task_id IN (SELECT id FROM tarefas WHERE projeto = ?)",
-            [scheduleProjectName, scheduleProjectName]
+            "DELETE FROM task_dependencies WHERE task_id IN (SELECT id FROM tarefas WHERE projeto_id = ? OR projeto = ?) OR predecessor_task_id IN (SELECT id FROM tarefas WHERE projeto_id = ? OR projeto = ?)",
+            [scheduleProjectId || 0, scheduleProjectName, scheduleProjectId || 0, scheduleProjectName]
           );
-          await conn.query("DELETE FROM tarefas WHERE projeto = ?", [scheduleProjectName]);
+          await conn.query("DELETE FROM tarefas WHERE projeto_id = ? OR projeto = ?", [scheduleProjectId || 0, scheduleProjectName]);
         } else {
           await conn.query("DELETE FROM task_assignments");
           await conn.query("DELETE FROM task_dependencies");
@@ -1044,14 +1044,14 @@ app.post("/api/import-ms-project", requireAuth, requireImportAccess, uploadMsPro
       }
 
       await conn.query(
-        "DELETE FROM task_assignments WHERE task_id IN (SELECT id FROM tarefas WHERE projeto = ?)",
-        [parsed.projectName]
+        "DELETE FROM task_assignments WHERE task_id IN (SELECT id FROM tarefas WHERE projeto_id = ? OR projeto = ?)",
+        [projectId || 0, parsed.projectName]
       );
       await conn.query(
-        "DELETE FROM task_dependencies WHERE task_id IN (SELECT id FROM tarefas WHERE projeto = ?) OR predecessor_task_id IN (SELECT id FROM tarefas WHERE projeto = ?)",
-        [parsed.projectName, parsed.projectName]
+        "DELETE FROM task_dependencies WHERE task_id IN (SELECT id FROM tarefas WHERE projeto_id = ? OR projeto = ?) OR predecessor_task_id IN (SELECT id FROM tarefas WHERE projeto_id = ? OR projeto = ?)",
+        [projectId || 0, parsed.projectName, projectId || 0, parsed.projectName]
       );
-      await conn.query("DELETE FROM tarefas WHERE projeto = ?", [parsed.projectName]);
+      await conn.query("DELETE FROM tarefas WHERE projeto_id = ? OR projeto = ?", [projectId || 0, parsed.projectName]);
 
       const resourceIdByName = new Map();
       for (const resource of parsed.resources) {

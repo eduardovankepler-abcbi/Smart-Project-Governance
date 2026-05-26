@@ -131,15 +131,15 @@ async function getProjectOrThrow(connection, projectId) {
   return rows[0];
 }
 
-async function getProjectTasksSnapshot(connection, projectName) {
+async function getProjectTasksSnapshot(connection, project) {
   const [rows] = await connection.query(
     `SELECT id, external_id, wbs, parent_id, tarefa, subtarefa, outline_level,
             data_inicio_planej_date, data_inicio_planej, data_fim_planej_date, data_fim_planej,
             esforco_planej, valor_previsto, percentual
        FROM tarefas
-      WHERE projeto = ?
+      WHERE projeto_id = ? OR projeto = ?
       ORDER BY sort_order, id`,
-    [projectName]
+    [project.id || 0, project.projeto]
   );
   return rows;
 }
@@ -176,7 +176,7 @@ async function createProjectBaseline(pool, { projectId, sourceType, baselineName
 
     await connection.beginTransaction();
     const project = await getProjectOrThrow(connection, normalizedProjectId);
-    const taskRows = await getProjectTasksSnapshot(connection, project.projeto);
+    const taskRows = await getProjectTasksSnapshot(connection, project);
     const [[counterRow]] = await connection.query(
       "SELECT COALESCE(MAX(baseline_number), 0) AS last_number FROM project_baselines WHERE project_id = ?",
       [normalizedProjectId]
@@ -542,10 +542,10 @@ async function getProjectCurveSeries(pool, { projectId, baselineId, metric }) {
     `SELECT id, projeto, data_inicio_planej, data_inicio_planej_date, data_fim_planej, data_fim_planej_date,
             data_inicio_real, data_inicio_real_date, data_fim_real, data_fim_real_date,
             esforco_real, valor_gasto, percentual, esforco_planej, valor_previsto
-       FROM tarefas
-      WHERE projeto = ?
+      FROM tarefas
+      WHERE projeto_id = ? OR projeto = ?
       ORDER BY sort_order, id`,
-    [project.projeto]
+    [project.id || 0, project.projeto]
   );
 
   return buildWeeklyCurve(project, baseline, baselineTasks, liveTasks, normalizedMetric);

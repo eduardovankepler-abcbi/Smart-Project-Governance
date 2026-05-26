@@ -163,7 +163,7 @@ function normalizeDependencies(rawDependencies = []) {
 }
 
 module.exports = function (pool, auth, taskHooks = {}) {
-  const { requireAuth, requireWriteAccess, getAccessibleProjectNamesFilter } = auth;
+  const { requireAuth, requireWriteAccess, getAccessibleProjectNamesFilter, getAccessibleProjectIdsFilter } = auth;
   const { mapTarefa } = require("../utils/mappers");
   const supabaseSync = require("../utils/supabaseSync");
   const { afterTaskChange = async () => {} } = taskHooks;
@@ -182,12 +182,16 @@ module.exports = function (pool, auth, taskHooks = {}) {
           [req.authUser.linkedResourceId]
         );
       } else {
-        const access = await getAccessibleProjectNamesFilter(req.authUser);
+        const access = await getAccessibleProjectIdsFilter(req.authUser);
+        const nameAccess = access.all ? { projectNames: [] } : await getAccessibleProjectNamesFilter(req.authUser);
         [rows] = access.all
           ? await pool.query("SELECT * FROM tarefas ORDER BY sort_order, id")
           : await pool.query(
-            "SELECT * FROM tarefas WHERE projeto IN (?) ORDER BY sort_order, id",
-            [access.projectNames.length ? access.projectNames : ["__none__"]]
+            "SELECT * FROM tarefas WHERE projeto_id IN (?) OR projeto IN (?) ORDER BY sort_order, id",
+            [
+              access.projectIds.length ? access.projectIds : [0],
+              nameAccess.projectNames.length ? nameAccess.projectNames : ["__none__"],
+            ]
           );
       }
       const visibleTaskIds = rows.map((row) => row.id);

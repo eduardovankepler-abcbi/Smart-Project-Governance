@@ -73,7 +73,10 @@ test("Excel preview scopes schedule XLSX replacement to one project", async () =
     if (sql === "SELECT COUNT(*) AS total FROM projetos") return [[{ total: 3 }]];
     if (sql.includes("FROM task_assignments")) return [[{ total: 5 }]];
     if (sql.includes("FROM task_dependencies")) return [[{ total: 4 }]];
-    if (sql.includes("FROM tarefas WHERE projeto = ?")) return [[{ total: 12 }]];
+    if (sql.includes("FROM tarefas WHERE projeto_id = ? OR projeto = ?")) {
+      assert.deepEqual(params, [42, "PROJETO ALFA"]);
+      return [[{ total: 12 }]];
+    }
     if (sql.includes("SELECT nome FROM recursos WHERE nome IN")) {
       assert.deepEqual(params, [["Flávio", "Eduardo"]]);
       return [[{ nome: "Flávio" }]];

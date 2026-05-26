@@ -32,9 +32,11 @@ function buildProjectCode(projeto) {
 async function syncProjectMetrics(pool, projeto) {
   if (!projeto) return;
 
+  const [existing] = await pool.query("SELECT id FROM projetos WHERE projeto = ? LIMIT 1", [projeto]);
+  const projectId = existing[0]?.id || null;
   const [taskRows] = await pool.query(
-    "SELECT * FROM tarefas WHERE projeto = ? ORDER BY sort_order, id",
-    [projeto]
+    "SELECT * FROM tarefas WHERE projeto_id = ? OR projeto = ? ORDER BY sort_order, id",
+    [projectId || 0, projeto]
   );
 
   const totalTarefas = taskRows.length;
@@ -63,14 +65,12 @@ async function syncProjectMetrics(pool, projeto) {
   const plannedFinishText = formatMmDdYy(latestFinish);
   const plannedFinishDate = normalizeDateInput(latestFinish) || null;
 
-  const [existing] = await pool.query("SELECT id FROM projetos WHERE projeto = ? LIMIT 1", [projeto]);
-
   if (existing.length) {
     await pool.query(
       `UPDATE projetos
        SET data_inicio_planej = ?, data_inicio_planej_date = ?, data_fim_planej = ?, data_fim_planej_date = ?, total_tarefas = ?, tarefas_concluidas = ?, tarefas_andamento = ?,
            tarefas_atrasadas = ?, tarefas_nao_iniciadas = ?, status = ?, conclusao = ?, valor_previsto = ?, valor_gasto = ?
-       WHERE projeto = ?`,
+       WHERE id = ?`,
       [
         plannedStartText,
         plannedStartDate,
@@ -85,7 +85,7 @@ async function syncProjectMetrics(pool, projeto) {
         conclusao,
         valorPrevisto,
         valorGasto,
-        projeto,
+        existing[0].id,
       ]
     );
     return existing[0].id;
@@ -113,6 +113,10 @@ async function syncProjectMetrics(pool, projeto) {
       projectStatus,
       conclusao,
     ]
+  );
+  await pool.query(
+    "UPDATE tarefas SET projeto_id = ? WHERE projeto_id IS NULL AND projeto = ?",
+    [insert.insertId, projeto]
   );
   return insert.insertId;
 }

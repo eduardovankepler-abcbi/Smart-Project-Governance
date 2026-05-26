@@ -16,7 +16,7 @@ module.exports = function (pool, auth) {
     const [rows] = await pool.query(
       `SELECT p.id as project_id, t.tarefa, p.projeto
        FROM tarefas t
-       INNER JOIN projetos p ON p.projeto = t.projeto
+       INNER JOIN projetos p ON p.id = t.projeto_id OR (t.projeto_id IS NULL AND p.projeto = t.projeto)
        WHERE t.id = ?
        LIMIT 1`,
       [taskId],
