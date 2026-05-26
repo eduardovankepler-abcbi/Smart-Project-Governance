@@ -37,7 +37,7 @@ const {
 } = require("./utils/parsing");
 const { syncFullSnapshot, checkSupabaseHealth, isSupabaseSyncEnabled } = require("./utils/supabaseSync");
 const { syncProjectMetrics } = require("./utils/projectMetrics");
-const { parseMsProjectXml } = require("./utils/msProjectXml");
+const { parseMsProjectXml, remapTasksForProjectImport } = require("./utils/msProjectXml");
 const { logAudit } = require("./utils/audit");
 const { BASELINE_SOURCE_TYPES, createProjectBaseline } = require("./utils/baselines");
 const { withMysqlSsl } = require("./utils/mysqlConnection");
@@ -1084,7 +1084,9 @@ app.post("/api/import-ms-project", requireAuth, requireImportAccess, uploadMsPro
         }
       }
 
-      for (const task of parsed.tasks) {
+      const importTasks = remapTasksForProjectImport(parsed.tasks, projectId);
+
+      for (const task of importTasks) {
         await conn.query(
           `INSERT INTO tarefas
             (id, parent_id, external_id, wbs, outline_level, sort_order, projeto, tarefa, subtarefa, responsavel, funcao, data_inicio_planej, data_inicio_planej_date, esforco_planej,

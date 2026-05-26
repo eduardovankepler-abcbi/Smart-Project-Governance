@@ -1,6 +1,6 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const { parseMsProjectXml } = require("../utils/msProjectXml");
+const { parseMsProjectXml, remapTasksForProjectImport } = require("../utils/msProjectXml");
 const { buildMsProjectImportPreview } = require("../utils/msProjectImportPreview");
 
 const IMPORT_CONFIRM_PHRASES = {
@@ -149,4 +149,16 @@ test("MS Project preview reports new project creation", async () => {
   assert.equal(preview.impact.projectsToUpdate, 0);
   assert.equal(preview.impact.projectsToPreserve, 4);
   assert.equal(preview.impact.tasksToReplace, 0);
+});
+
+test("MS Project import remaps task ids to avoid global collisions", () => {
+  const parsed = parseMsProjectXml(buildSampleXml("PROJETO XML"));
+  const tasks = remapTasksForProjectImport(parsed.tasks, 77);
+
+  assert.equal(tasks[0].id, "p77-1");
+  assert.equal(tasks[1].id, "p77-2");
+  assert.equal(tasks[1].parentId, "p77-1");
+  assert.equal(tasks[1].predecessors[0].predecessorTaskId, "p77-1");
+  assert.equal(tasks[1].externalId, "2");
+  assert.equal(tasks[1].wbs, "1.1");
 });

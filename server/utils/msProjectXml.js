@@ -48,6 +48,33 @@ function buildParentWbs(wbs) {
   return String(wbs).split(".").slice(0, -1).join(".");
 }
 
+function buildImportedTaskId(projectId, sequence) {
+  return `p${projectId}-${sequence}`.slice(0, 20);
+}
+
+function remapTasksForProjectImport(tasks, projectId) {
+  const idMap = new Map();
+  const wbsMap = new Map();
+  tasks.forEach((task, index) => {
+    const internalId = buildImportedTaskId(projectId, index + 1);
+    idMap.set(String(task.id), internalId);
+    if (task.wbs) wbsMap.set(String(task.wbs), internalId);
+  });
+
+  return tasks.map((task, index) => ({
+    ...task,
+    id: buildImportedTaskId(projectId, index + 1),
+    parentId: wbsMap.get(String(task.parentId || "")) || idMap.get(String(task.parentId || "")) || "",
+    predecessors: (task.predecessors || []).map((dependency) => ({
+      ...dependency,
+      predecessorTaskId:
+        idMap.get(String(dependency.predecessorTaskId || ""))
+        || wbsMap.get(String(dependency.predecessorTaskId || ""))
+        || dependency.predecessorTaskId,
+    })),
+  }));
+}
+
 function parseMsProjectXml(xmlContent) {
   const parser = new XMLParser({ ignoreAttributes: false, parseTagValue: true, trimValues: true });
   const xml = parser.parse(xmlContent);
@@ -188,4 +215,4 @@ function parseMsProjectXml(xmlContent) {
   };
 }
 
-module.exports = { parseMsProjectXml };
+module.exports = { parseMsProjectXml, remapTasksForProjectImport };
