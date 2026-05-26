@@ -708,6 +708,11 @@ app.post("/api/import-excel", requireAuth, requireImportAccess, upload.single("f
         const data = sheetToObjects(tarefaSheet);
         if (data.length > MAX_ROWS) throw new Error(`Limite de ${MAX_ROWS} linhas excedido na aba Tarefa`);
         const isEdrawSchedule = data.length > 0 && col(data[0], "Task") !== undefined && col(data[0], "WBS") !== undefined;
+        const projectIdByName = new Map();
+        if (!isEdrawSchedule) {
+          const [projectRows] = await conn.query("SELECT id, projeto FROM projetos");
+          projectRows.forEach((row) => projectIdByName.set(row.projeto, row.id));
+        }
         const externalIdToTaskId = new Map();
         if (isEdrawSchedule) {
           data.forEach((row, index) => {
@@ -754,14 +759,16 @@ app.post("/api/import-excel", requireAuth, requireImportAccess, upload.single("f
           const status = isEdrawSchedule
             ? mapScheduleStatus(col(r, "Status"), percentual)
             : sanitizeString(col(r, "Status", "status"), 50);
+          const taskProjectName = isEdrawSchedule ? scheduleProjectName : sanitizeString(col(r, "Projeto", "projeto"), 200);
+          const taskProjectId = isEdrawSchedule ? scheduleProjectId : projectIdByName.get(taskProjectName) || null;
           const dataInicioPlanej = parseExcelDate(col(r, "Data Início Planejado", "data_inicio_planej", "Start"));
           const dataFimPlanej = parseExcelDate(col(r, "Data Fim Planejado", "data_fim_planej", "Finish"));
           const dataInicioReal = parseExcelDate(col(r, "Data Início Real", "data_inicio_real", "ActualStart", "Actual Start"));
           const dataFimReal = parseExcelDate(col(r, "Data Fim Real", "data_fim_real", "ActualFinish", "Actual Finish"));
           const constraintDate = parseExcelDate(col(r, "Data da Restrição", "Data Restrição", "constraint_date"));
           await conn.query(
-            `INSERT INTO tarefas (id, parent_id, external_id, wbs, outline_level, sort_order, projeto, tarefa, subtarefa, responsavel, funcao, data_inicio_planej, data_inicio_planej_date, esforco_planej, data_fim_planej, data_fim_planej_date, data_inicio_real, data_inicio_real_date, esforco_real, data_fim_real, data_fim_real_date, percentual, status, duration_minutes, constraint_date, constraint_date_date, valor_previsto, valor_gasto, dias_planejados, dias_real, dias_completados)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            `INSERT INTO tarefas (id, parent_id, external_id, wbs, outline_level, sort_order, projeto, projeto_id, tarefa, subtarefa, responsavel, funcao, data_inicio_planej, data_inicio_planej_date, esforco_planej, data_fim_planej, data_fim_planej_date, data_inicio_real, data_inicio_real_date, esforco_real, data_fim_real, data_fim_real_date, percentual, status, duration_minutes, constraint_date, constraint_date_date, valor_previsto, valor_gasto, dias_planejados, dias_real, dias_completados)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
             [
               taskId,
               parentId || null,
@@ -769,7 +776,8 @@ app.post("/api/import-excel", requireAuth, requireImportAccess, upload.single("f
               wbs,
               isEdrawSchedule ? outlineLevelFromWbs(wbs) : sanitizeInt(col(r, "Outline Level", "outlineLevel"), 1),
               isEdrawSchedule ? sanitizeInt(externalId, index + 1) : sanitizeInt(col(r, "Sort Order", "sortOrder"), index + 1),
-              isEdrawSchedule ? scheduleProjectName : sanitizeString(col(r, "Projeto", "projeto"), 200),
+              taskProjectName,
+              taskProjectId,
               isEdrawSchedule ? cleanTaskName(col(r, "Task", "Tarefa")) : sanitizeString(col(r, "Tarefa", "tarefa"), 500),
               isEdrawSchedule ? "" : sanitizeString(col(r, "Sub-tarefa", "subtarefa", "Subtarefa"), 500),
               isEdrawSchedule ? sanitizeString(col(r, "Resources", "Recursos", "Responsável", "Responsavel"), 500) : sanitizeString(col(r, "Responsável", "responsavel", "Responsavel"), 500),
@@ -1089,10 +1097,10 @@ app.post("/api/import-ms-project", requireAuth, requireImportAccess, uploadMsPro
       for (const task of importTasks) {
         await conn.query(
           `INSERT INTO tarefas
-            (id, parent_id, external_id, wbs, outline_level, sort_order, projeto, tarefa, subtarefa, responsavel, funcao, data_inicio_planej, data_inicio_planej_date, esforco_planej,
+            (id, parent_id, external_id, wbs, outline_level, sort_order, projeto, projeto_id, tarefa, subtarefa, responsavel, funcao, data_inicio_planej, data_inicio_planej_date, esforco_planej,
              data_fim_planej, data_fim_planej_date, data_inicio_real, data_inicio_real_date, esforco_real, data_fim_real, data_fim_real_date, percentual, status, task_type, is_milestone, duration_minutes, is_manual,
              constraint_type, constraint_date, constraint_date_date, notes, valor_previsto, valor_gasto, dias_planejados, dias_real, dias_completados)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
           [
             task.id,
             task.parentId || null,
@@ -1101,6 +1109,7 @@ app.post("/api/import-ms-project", requireAuth, requireImportAccess, uploadMsPro
             task.outlineLevel,
             task.sortOrder,
             task.projeto,
+            projectId,
             task.tarefa,
             task.subtarefa,
             task.responsavel,

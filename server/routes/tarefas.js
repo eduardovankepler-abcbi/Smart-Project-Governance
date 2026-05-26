@@ -60,7 +60,10 @@ function buildNextChildWbs(parentTask, tasks = []) {
 async function loadProjectTaskContext(conn, projeto) {
   const [projectRows] = await conn.query("SELECT id, project_code, projeto FROM projetos WHERE projeto = ? LIMIT 1", [projeto]);
   if (!projectRows.length) return null;
-  const [taskRows] = await conn.query("SELECT id, parent_id, external_id, wbs, projeto FROM tarefas WHERE projeto = ? ORDER BY sort_order, id", [projeto]);
+  const [taskRows] = await conn.query(
+    "SELECT id, parent_id, external_id, wbs, projeto, projeto_id FROM tarefas WHERE projeto_id = ? OR projeto = ? ORDER BY sort_order, id",
+    [projectRows[0].id, projeto]
+  );
   return { project: projectRows[0], tasks: taskRows };
 }
 
@@ -261,10 +264,10 @@ module.exports = function (pool, auth, taskHooks = {}) {
       await conn.beginTransaction();
       await conn.query(
         `INSERT INTO tarefas
-          (id, parent_id, external_id, wbs, outline_level, sort_order, projeto, tarefa, subtarefa, responsavel, funcao, data_inicio_planej, data_inicio_planej_date, esforco_planej,
+          (id, parent_id, external_id, wbs, outline_level, sort_order, projeto, projeto_id, tarefa, subtarefa, responsavel, funcao, data_inicio_planej, data_inicio_planej_date, esforco_planej,
            data_fim_planej, data_fim_planej_date, data_inicio_real, data_inicio_real_date, esforco_real, data_fim_real, data_fim_real_date, percentual, status, task_type, is_milestone, duration_minutes, is_manual,
            constraint_type, constraint_date, constraint_date_date, notes, valor_previsto, valor_gasto, dias_planejados, dias_real, dias_completados)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           id,
           parentId || null,
@@ -273,6 +276,7 @@ module.exports = function (pool, auth, taskHooks = {}) {
           outlineLevel,
           sanitizeInt(b.sortOrder, generated.sortOrder),
           projeto,
+          context.project.id,
           sanitizeString(b.tarefa, 500),
           sanitizeString(b.subtarefa, 500),
           responsavel,
@@ -401,7 +405,7 @@ module.exports = function (pool, auth, taskHooks = {}) {
       await conn.beginTransaction();
       await conn.query(
         `UPDATE tarefas
-         SET parent_id=?, external_id=?, wbs=?, outline_level=?, sort_order=?, projeto=?, tarefa=?, subtarefa=?, responsavel=?, funcao=?,
+         SET parent_id=?, external_id=?, wbs=?, outline_level=?, sort_order=?, projeto=?, projeto_id=?, tarefa=?, subtarefa=?, responsavel=?, funcao=?,
              data_inicio_planej=?, data_inicio_planej_date=?, esforco_planej=?, data_fim_planej=?, data_fim_planej_date=?, data_inicio_real=?, data_inicio_real_date=?, esforco_real=?, data_fim_real=?, data_fim_real_date=?, percentual=?, status=?,
              task_type=?, is_milestone=?, duration_minutes=?, is_manual=?, constraint_type=?, constraint_date=?, constraint_date_date=?, notes=?, valor_previsto=?,
              valor_gasto=?, dias_planejados=?, dias_real=?, dias_completados=?
@@ -413,6 +417,7 @@ module.exports = function (pool, auth, taskHooks = {}) {
           sanitizeInt(b.outlineLevel, depthFromCode(nextWbs) || 1),
           sanitizeInt(b.sortOrder, beforeTaskRows[0].sort_order || 0),
           nextProject,
+          context?.project?.id || beforeTaskRows[0].projeto_id || null,
           sanitizeString(b.tarefa, 500),
           sanitizeString(b.subtarefa, 500),
           responsavel,

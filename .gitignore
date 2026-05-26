@@ -25,6 +25,7 @@ server/uploads/
 backups/
 *.sql
 *.sql.gz
+!server/database/migrations/mysql/*.sql
 
 # Editor directories and files
 .vscode/*

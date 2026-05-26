@@ -57,8 +57,8 @@ async function loadProjectSnapshot(pool, projectId) {
   }
 
   const [taskRows] = await pool.query(
-    "SELECT * FROM tarefas WHERE projeto = ? ORDER BY sort_order, id",
-    [projectRows[0].projeto]
+    "SELECT * FROM tarefas WHERE projeto_id = ? OR projeto = ? ORDER BY sort_order, id",
+    [projectRows[0].id, projectRows[0].projeto]
   );
   const taskIds = taskRows.map((task) => task.id);
   const [assignmentRows] = taskIds.length
@@ -322,8 +322,8 @@ async function instantiateProjectFromTemplate(pool, payload) {
 
       await conn.query(
         `INSERT INTO tarefas
-          (id, parent_id, external_id, wbs, outline_level, sort_order, projeto, tarefa, subtarefa, responsavel, funcao, data_inicio_planej, data_inicio_planej_date, esforco_planej, data_fim_planej, data_fim_planej_date, data_inicio_real, data_inicio_real_date, esforco_real, data_fim_real, data_fim_real_date, percentual, status, task_type, is_milestone, duration_minutes, is_manual, constraint_type, constraint_date, constraint_date_date, notes, valor_previsto, valor_gasto, dias_planejados, dias_real, dias_completados)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          (id, parent_id, external_id, wbs, outline_level, sort_order, projeto, projeto_id, tarefa, subtarefa, responsavel, funcao, data_inicio_planej, data_inicio_planej_date, esforco_planej, data_fim_planej, data_fim_planej_date, data_inicio_real, data_inicio_real_date, esforco_real, data_fim_real, data_fim_real_date, percentual, status, task_type, is_milestone, duration_minutes, is_manual, constraint_type, constraint_date, constraint_date_date, notes, valor_previsto, valor_gasto, dias_planejados, dias_real, dias_completados)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           newTaskId,
           parentId,
@@ -332,6 +332,7 @@ async function instantiateProjectFromTemplate(pool, payload) {
           sanitizeInt(task.outline_level) || 1,
           sanitizeInt(task.sort_order) || sequence,
           projectName,
+          newProjectId,
           sanitizeString(task.tarefa, 500),
           sanitizeString(task.subtarefa, 500),
           sanitizeString(task.responsavel, 255),

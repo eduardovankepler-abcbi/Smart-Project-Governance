@@ -89,6 +89,7 @@ function mapTarefa(row, assignments = [], predecessors = []) {
     sortOrder: row.sort_order || 0,
     parentId: row.parent_id || "",
     projeto: row.projeto,
+    projectId: row.projeto_id || undefined,
     tarefa: row.tarefa,
     subtarefa: row.subtarefa,
     responsavel: row.responsavel,

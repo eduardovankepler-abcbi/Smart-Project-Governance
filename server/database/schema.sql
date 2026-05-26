@@ -190,6 +190,7 @@ CREATE TABLE tarefas (
   outline_level INT DEFAULT 1,
   sort_order INT DEFAULT 0,
   projeto VARCHAR(100) NOT NULL,
+  projeto_id INT NULL,
   tarefa VARCHAR(255) DEFAULT '',
   subtarefa VARCHAR(255) DEFAULT '',
   responsavel VARCHAR(255) DEFAULT '',
@@ -221,6 +222,7 @@ CREATE TABLE tarefas (
   dias_completados INT DEFAULT 0,
   INDEX idx_parent_id (parent_id),
   INDEX idx_projeto (projeto),
+  INDEX idx_tarefas_projeto_id (projeto_id),
   INDEX idx_wbs (wbs),
   INDEX idx_tarefas_constraint_date_date (constraint_date_date)
 ) ENGINE=InnoDB;
