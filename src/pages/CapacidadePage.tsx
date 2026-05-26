@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { AlertTriangle, CheckCircle2, Gauge, Users } from "lucide-react";
+import { AlertTriangle, CalendarRange, CheckCircle2, Gauge, Users } from "lucide-react";
 import { ResponsiveContainer, BarChart, Bar, CartesianGrid, XAxis, YAxis, Tooltip } from "recharts";
 import { getTaskResourceNames } from "@/utils/projectModel";
 import ChartPreviewModal from "@/components/ChartPreviewModal";
@@ -21,6 +21,8 @@ interface CapacityAssignment {
   actualWork: number;
   remainingWork: number;
   cost: number;
+  startDate: Date | null;
+  finishDate: Date | null;
 }
 
 interface CapacityRow {
@@ -41,6 +43,98 @@ interface CapacityRow {
   businessUnits: string[];
   produtos: string[];
   projetos: string[];
+}
+
+type PeriodPreset = "current-month" | "next-month" | "quarter" | "all" | "custom";
+
+interface CapacityPeriod {
+  start: Date | null;
+  end: Date | null;
+}
+
+function toIsoDateInput(date: Date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function startOfMonth(date: Date) {
+  return new Date(date.getFullYear(), date.getMonth(), 1);
+}
+
+function endOfMonth(date: Date) {
+  return new Date(date.getFullYear(), date.getMonth() + 1, 0);
+}
+
+function addMonths(date: Date, months: number) {
+  return new Date(date.getFullYear(), date.getMonth() + months, 1);
+}
+
+function parseDateValue(value?: string) {
+  if (!value) return null;
+  const raw = String(value).trim();
+  if (!raw) return null;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
+    const date = new Date(`${raw}T00:00:00`);
+    return Number.isNaN(date.getTime()) ? null : date;
+  }
+  const slashMatch = raw.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/);
+  if (slashMatch) {
+    const first = Number(slashMatch[1]);
+    const second = Number(slashMatch[2]);
+    const year = Number(slashMatch[3].length === 2 ? `20${slashMatch[3]}` : slashMatch[3]);
+    const month = first > 12 ? second : first;
+    const day = first > 12 ? first : second;
+    const date = new Date(year, month - 1, day);
+    return Number.isNaN(date.getTime()) ? null : date;
+  }
+  return null;
+}
+
+function getTaskDateRange(task: { dataInicioPlanej?: string; dataFimPlanej?: string; dataInicioReal?: string; dataFimReal?: string }) {
+  const startDate = parseDateValue(task.dataInicioPlanej) || parseDateValue(task.dataInicioReal);
+  const finishDate = parseDateValue(task.dataFimPlanej) || parseDateValue(task.dataFimReal) || startDate;
+  return { startDate, finishDate };
+}
+
+function getPeriodFromPreset(preset: PeriodPreset, customStart: string, customEnd: string): CapacityPeriod {
+  if (preset === "all") return { start: null, end: null };
+  if (preset === "custom") {
+    const start = parseDateValue(customStart);
+    const end = parseDateValue(customEnd) || start;
+    if (start && end && end.getTime() < start.getTime()) return { start: end, end: start };
+    return {
+      start,
+      end,
+    };
+  }
+  const today = new Date();
+  if (preset === "next-month") {
+    const nextMonth = addMonths(today, 1);
+    return { start: startOfMonth(nextMonth), end: endOfMonth(nextMonth) };
+  }
+  if (preset === "quarter") {
+    return { start: startOfMonth(today), end: endOfMonth(addMonths(today, 2)) };
+  }
+  return { start: startOfMonth(today), end: endOfMonth(today) };
+}
+
+function calculateOverlapFactor(startDate: Date | null, finishDate: Date | null, period: CapacityPeriod) {
+  if (!period.start || !period.end) return 1;
+  if (!startDate && !finishDate) return 0;
+  const taskStart = startDate || finishDate;
+  const taskEnd = finishDate || startDate;
+  if (!taskStart || !taskEnd) return 0;
+  const normalizedTaskStart = new Date(taskStart.getFullYear(), taskStart.getMonth(), taskStart.getDate());
+  const normalizedTaskEnd = new Date(taskEnd.getFullYear(), taskEnd.getMonth(), taskEnd.getDate());
+  const overlapStart = new Date(Math.max(normalizedTaskStart.getTime(), period.start.getTime()));
+  const overlapEnd = new Date(Math.min(normalizedTaskEnd.getTime(), period.end.getTime()));
+  if (overlapEnd.getTime() < overlapStart.getTime()) return 0;
+  const dayMs = 24 * 60 * 60 * 1000;
+  const totalDays = Math.max(Math.round((normalizedTaskEnd.getTime() - normalizedTaskStart.getTime()) / dayMs) + 1, 1);
+  const overlapDays = Math.max(Math.round((overlapEnd.getTime() - overlapStart.getTime()) / dayMs) + 1, 0);
+  return Math.min(overlapDays / totalDays, 1);
 }
 
 function getStatusMeta(occupancyPct: number) {
@@ -74,6 +168,14 @@ export default function CapacidadePage() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [businessUnitFilter, setBusinessUnitFilter] = useState("all");
   const [produtoFilter, setProdutoFilter] = useState("all");
+  const [periodPreset, setPeriodPreset] = useState<PeriodPreset>("current-month");
+  const [customStart, setCustomStart] = useState(() => toIsoDateInput(startOfMonth(new Date())));
+  const [customEnd, setCustomEnd] = useState(() => toIsoDateInput(endOfMonth(new Date())));
+
+  const selectedPeriod = useMemo(
+    () => getPeriodFromPreset(periodPreset, customStart, customEnd),
+    [periodPreset, customStart, customEnd],
+  );
 
   const capacityRows = useMemo<CapacityRow[]>(() => {
     const projectMeta = new Map(
@@ -87,6 +189,10 @@ export default function CapacidadePage() {
     );
 
     const normalizedAssignments: CapacityAssignment[] = tarefas.flatMap((task) => {
+      const { startDate, finishDate } = getTaskDateRange(task);
+      const overlapFactor = calculateOverlapFactor(startDate, finishDate, selectedPeriod);
+      if (overlapFactor <= 0) return [];
+
       if (task.assignments?.length) {
         return task.assignments.map((assignment) => ({
           resourceId: assignment.resourceId,
@@ -94,10 +200,12 @@ export default function CapacidadePage() {
           projeto: task.projeto,
           tarefa: task.tarefa,
           units: Number(assignment.units || 0),
-          work: Number(assignment.work || 0),
-          actualWork: Number(assignment.actualWork || 0),
-          remainingWork: Number(assignment.remainingWork || 0),
-          cost: Number(assignment.cost || 0),
+          work: Number(assignment.work || 0) * overlapFactor,
+          actualWork: Number(assignment.actualWork || 0) * overlapFactor,
+          remainingWork: Number(assignment.remainingWork || 0) * overlapFactor,
+          cost: Number(assignment.cost || 0) * overlapFactor,
+          startDate,
+          finishDate,
         }));
       }
 
@@ -110,10 +218,12 @@ export default function CapacidadePage() {
         projeto: task.projeto,
         tarefa: task.tarefa,
         units: 1 / splitFactor,
-        work: Number(task.esforcoPlanej || 0) / splitFactor,
-        actualWork: Number(task.esforcoReal || 0) / splitFactor,
-        remainingWork: Math.max(Number(task.esforcoPlanej || 0) - Number(task.esforcoReal || 0), 0) / splitFactor,
+        work: (Number(task.esforcoPlanej || 0) / splitFactor) * overlapFactor,
+        actualWork: (Number(task.esforcoReal || 0) / splitFactor) * overlapFactor,
+        remainingWork: (Math.max(Number(task.esforcoPlanej || 0) - Number(task.esforcoReal || 0), 0) / splitFactor) * overlapFactor,
         cost: 0,
+        startDate,
+        finishDate,
       }));
     });
 
@@ -178,7 +288,7 @@ export default function CapacidadePage() {
         return true;
       })
       .sort((a, b) => b.occupancyPct - a.occupancyPct || b.plannedWork - a.plannedWork);
-  }, [projetos, tarefas, recursos, search, statusFilter, businessUnitFilter, produtoFilter]);
+  }, [projetos, tarefas, recursos, search, statusFilter, businessUnitFilter, produtoFilter, selectedPeriod]);
 
   const businessUnitOptions = useMemo(
     () => Array.from(new Set(projetos.map((item) => item.businessUnitName || "Sem BU"))).filter(Boolean).sort(),
@@ -224,6 +334,32 @@ export default function CapacidadePage() {
       <Header title="Capacidade" />
       <div className="space-y-6 p-6 animate-fade-in">
         <div className="flex flex-wrap items-end gap-3">
+          <Select value={periodPreset} onValueChange={(value) => setPeriodPreset(value as PeriodPreset)}>
+            <SelectTrigger className="w-48"><CalendarRange size={16} className="mr-2" /><SelectValue placeholder="Período" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="current-month">Mês atual</SelectItem>
+              <SelectItem value="next-month">Próximo mês</SelectItem>
+              <SelectItem value="quarter">Próximos 3 meses</SelectItem>
+              <SelectItem value="all">Todo o cronograma</SelectItem>
+              <SelectItem value="custom">Personalizado</SelectItem>
+            </SelectContent>
+          </Select>
+          {periodPreset === "custom" && (
+            <>
+              <Input
+                type="date"
+                value={customStart}
+                onChange={(e) => setCustomStart(e.target.value)}
+                className="w-40"
+              />
+              <Input
+                type="date"
+                value={customEnd}
+                onChange={(e) => setCustomEnd(e.target.value)}
+                className="w-40"
+              />
+            </>
+          )}
           <Input
             placeholder="Buscar recurso, função, projeto ou produto..."
             value={search}
