@@ -20,7 +20,10 @@ O sistema já cobre:
 - comentários por projeto e tarefa
 - trilha básica de auditoria
 - visão de capacidade e sobrealocação
-- importação de cronograma por XML do MS Project
+- importação de cronograma por XLSX e XML do MS Project com prévia de impacto
+- importação administrativa completa restrita a `admin`
+- reset administrativo de senha
+- baselines e curva S semanal por esforço, custo ou progresso
 - sincronização automática opcional com Supabase
 
 ## Banco ativo recomendado
@@ -230,19 +233,38 @@ Use esse acesso apenas para bootstrap e troque a senha imediatamente. Depois:
 
 - política de senha forte
 - troca de senha pelo usuário autenticado
+- reset administrativo de senha com regras por perfil
 - expiração de sessão por `SESSION_DAYS`
 - encerramento das demais sessões ao trocar senha
 - auditoria de login, logout e alterações de cadastro
+- validação de tipo/conteúdo de arquivos importados
+- prévia de impacto antes de importações XLSX e XML
+- confirmação dupla para importação administrativa completa
+
+## Importação de cronogramas
+
+O sistema separa três fluxos:
+
+- `Importar Cronograma`: aceita XLSX/XLSM de cronograma e XML do MS Project. Substitui apenas o cronograma do projeto detectado no arquivo.
+- `Importação completa`: fica em Governança, visível para `admin`, e atende Excel legado com abas `Projeto`, `Tarefa` e `Recurso`.
+- Prévia de impacto: antes de confirmar, o app mostra projetos/tarefas/recursos do arquivo e quais registros existentes serão substituídos, criados, reutilizados ou preservados.
+
+Confirmações exigidas:
+
+- Cronograma XLSX/XML: digitar `SUBSTITUIR CRONOGRAMA`.
+- Importação completa: digitar `SUBSTITUIR TUDO`, marcar confirmação de backup e digitar `CONFIRMO BACKUP`.
+
+Antes de usar a importação completa em produção, gere e guarde um backup recente fora do ambiente produtivo. Veja [OPERATIONS.md](./OPERATIONS.md).
 
 ## O que ainda segue pendente
 
 Os itens abaixo continuam como próximos passos naturais:
 
-- reset administrativo de senha
 - datas totalmente tipadas como `DATE/DATETIME` em todos os campos restantes
 - mais `foreign keys` em entidades secundárias e cenários de legado mais antigos
-- testes mais amplos de governança e importação MS Project
+- testes end-to-end mais amplos para rotas HTTP de importação
 - refinamento avançado de compatibilidade MS Project: calendários, baselines e time-phased
+- saneamento das vulnerabilidades restantes em dependências transitivas
 
 ## Testes
 
@@ -258,6 +280,20 @@ Hoje já existem testes para:
 - autenticação e política de senha
 - helpers de governança
 - detecção de alocação duplicada
+- parsing de datas
+- parsing de Excel/XLSX de cronograma
+- regras de acesso de projetos, usuários e alocações
+- prévia de impacto de importação Excel
+- prévia de impacto de importação XML do MS Project
+
+Frontend:
+
+```bash
+npm test -- src/test/importUtils.test.ts
+npm run build
+```
+
+Hoje os testes de importação frontend cobrem XLSX com cabeçalhos deslocados e exportações EdrawProj/cronograma.
 
 ## Restore e recuperação
 

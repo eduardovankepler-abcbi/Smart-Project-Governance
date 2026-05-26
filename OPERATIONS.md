@@ -70,6 +70,25 @@ $env:DB_SSL_CA_FILE = ""
 
 Use `verify_ca` for routine backups once the CA file is available.
 
+## Destructive Import Safety
+
+The app has preflight preview for schedule XLSX, MS Project XML, and full administrative Excel imports.
+
+Normal schedule imports replace only the detected project schedule and require:
+
+```text
+SUBSTITUIR CRONOGRAMA
+```
+
+Full administrative Excel import is intentionally more restrictive. It is visible only to `admin` users and requires:
+
+```text
+SUBSTITUIR TUDO
+CONFIRMO BACKUP
+```
+
+It also requires checking the backup acknowledgement in the UI. Run and verify a fresh Aiven backup before using this flow in production.
+
 ## Restore Caution
 
 Do not restore directly over production without first confirming the target host, database name, and dump date.

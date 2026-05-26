@@ -17,8 +17,13 @@
     "exceljs": "^4.4.0",
     "express": "^4.18.2",
     "fast-xml-parser": "^5.3.0",
-    "multer": "^1.4.5-lts.1",
+    "multer": "^2.1.1",
     "mysql2": "^3.9.1"
+  },
+  "overrides": {
+    "exceljs": {
+      "uuid": "^11.1.1"
+    }
   },
   "devDependencies": {
     "nodemon": "^3.0.3"

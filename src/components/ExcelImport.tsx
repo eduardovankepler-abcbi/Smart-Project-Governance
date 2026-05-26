@@ -1,6 +1,8 @@
 import { useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Upload, Loader2 } from "lucide-react";
@@ -10,12 +12,14 @@ import { useAuth } from "@/contexts/AuthContext";
 import { parseExcelFile } from "@/utils/importUtils";
 import { isApiEnabled } from "@/config/api";
 import * as api from "@/services/api";
+import type { ExcelImportPreview } from "@/services/api";
 
 const MAX_IMPORT_SIZE_MB = 25;
 const MAX_IMPORT_SIZE_BYTES = MAX_IMPORT_SIZE_MB * 1024 * 1024;
 const IMPORT_CONFIRMATION_PHRASES = {
   schedule: "SUBSTITUIR CRONOGRAMA",
   adminFull: "SUBSTITUIR TUDO",
+  adminBackup: "CONFIRMO BACKUP",
   xml: "SUBSTITUIR CRONOGRAMA",
 } as const;
 
@@ -27,8 +31,12 @@ export default function ExcelImport({ mode = "schedule" }: { mode?: ExcelImportM
   const [loading, setLoading] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [confirmationText, setConfirmationText] = useState("");
+  const [destructiveConfirmationText, setDestructiveConfirmationText] = useState("");
+  const [backupAcknowledged, setBackupAcknowledged] = useState(false);
   const [pendingFile, setPendingFile] = useState<File | null>(null);
   const [pendingImportKind, setPendingImportKind] = useState<PendingImportKind | null>(null);
+  const [preview, setPreview] = useState<ExcelImportPreview | null>(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
   const { toast } = useToast();
   const { user } = useAuth();
   const { setProjetos, setTarefas, setRecursos, refreshAll } = useData();
@@ -40,6 +48,10 @@ export default function ExcelImport({ mode = "schedule" }: { mode?: ExcelImportM
     setPendingFile(null);
     setPendingImportKind(null);
     setConfirmationText("");
+    setDestructiveConfirmationText("");
+    setBackupAcknowledged(false);
+    setPreview(null);
+    setPreviewLoading(false);
     setConfirmOpen(false);
     if (inputRef.current) inputRef.current.value = "";
   };
@@ -56,7 +68,12 @@ export default function ExcelImport({ mode = "schedule" }: { mode?: ExcelImportM
             description: `${result.imported.project}: ${result.imported.tarefas} tarefas e ${result.imported.recursos} recursos`,
           });
         } else {
-          const result = await api.importExcel(file, { mode: isAdminFull ? "replace_all" : "replace_project" });
+          const result = await api.importExcel(file, {
+            mode: isAdminFull ? "replace_all" : "replace_project",
+            confirmationText,
+            destructiveConfirmation: destructiveConfirmationText,
+            backupAcknowledged,
+          });
           await refreshAll();
           toast({
             title: isAdminFull ? "Importação administrativa concluída" : "Cronograma importado",
@@ -98,7 +115,7 @@ export default function ExcelImport({ mode = "schedule" }: { mode?: ExcelImportM
     }
   };
 
-  const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -137,7 +154,29 @@ export default function ExcelImport({ mode = "schedule" }: { mode?: ExcelImportM
     setPendingFile(file);
     setPendingImportKind(ext === "xml" ? "xml" : "excel");
     setConfirmationText("");
+    setDestructiveConfirmationText("");
+    setBackupAcknowledged(false);
+    setPreview(null);
     setConfirmOpen(true);
+
+    if (isApiEnabled()) {
+      setPreviewLoading(true);
+      try {
+        const nextPreview = ext === "xml"
+          ? await api.previewMsProjectImport(file)
+          : await api.previewExcelImport(file);
+        setPreview(nextPreview);
+      } catch (err) {
+        toast({
+          title: "Prévia indisponível",
+          description: err instanceof Error ? err.message : "Não foi possível calcular o impacto da importação.",
+          variant: "destructive",
+        });
+        resetSelection();
+      } finally {
+        setPreviewLoading(false);
+      }
+    }
   };
 
   const expectedPhrase = pendingImportKind
@@ -145,12 +184,42 @@ export default function ExcelImport({ mode = "schedule" }: { mode?: ExcelImportM
       ? IMPORT_CONFIRMATION_PHRASES.xml
       : IMPORT_CONFIRMATION_PHRASES[mode]
     : "";
-  const canConfirm = !!pendingFile && !!pendingImportKind && confirmationText.trim().toUpperCase() === expectedPhrase;
+  const hasBackupConfirmation = !isAdminFull
+    || (
+      backupAcknowledged
+      && destructiveConfirmationText.trim().toUpperCase() === IMPORT_CONFIRMATION_PHRASES.adminBackup
+    );
+  const canConfirm = !!pendingFile
+    && !!pendingImportKind
+    && confirmationText.trim().toUpperCase() === expectedPhrase
+    && hasBackupConfirmation;
 
   const handleConfirmImport = async () => {
     if (!pendingFile || !pendingImportKind) return;
     await executeImport(pendingFile, pendingImportKind === "xml" ? "xml" : "xlsx");
   };
+
+  const impactLabel: Record<string, string> = {
+    projectsToCreate: "Projetos a criar",
+    projectsToUpdate: "Projetos a atualizar",
+    projectsToPreserve: "Projetos preservados",
+    projectsToDelete: "Projetos a apagar",
+    tasksToCreate: "Tarefas a criar",
+    tasksToReplace: "Tarefas a substituir",
+    tasksToDelete: "Tarefas a apagar",
+    dependenciesToReplace: "Dependências a substituir",
+    dependenciesToDelete: "Dependências a apagar",
+    assignmentsToReplace: "Alocações a substituir",
+    assignmentsToDelete: "Alocações a apagar",
+    resourcesToCreate: "Recursos a criar",
+    resourcesToReuse: "Recursos reutilizados",
+    resourcesToPreserve: "Recursos preservados",
+    resourcesToDelete: "Recursos a apagar",
+  };
+
+  const impactEntries = preview
+    ? Object.entries(preview.impact).filter(([, value]) => Number(value) > 0)
+    : [];
 
   return (
     <>
@@ -193,6 +262,57 @@ export default function ExcelImport({ mode = "schedule" }: { mode?: ExcelImportM
                   : "Esta importação Excel substituirá apenas o cronograma do projeto encontrado no arquivo, preservando os demais projetos do ambiente."}
             </p>
 
+            {pendingImportKind ? (
+              <div className="rounded-lg border border-border bg-muted/30 p-3">
+                {previewLoading ? (
+                  <p className="text-sm text-muted-foreground">Calculando prévia de impacto...</p>
+                ) : preview ? (
+                  <div className="space-y-3">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Badge variant={preview.importType === "admin_full" ? "destructive" : "secondary"}>
+                        {preview.importType === "admin_full"
+                          ? "Substituição completa"
+                          : preview.importType === "ms_project_xml"
+                            ? "MS Project XML"
+                            : "Cronograma por projeto"}
+                      </Badge>
+                      {preview.projectName ? (
+                        <span className="text-sm font-medium text-foreground">{preview.projectName}</span>
+                      ) : null}
+                    </div>
+                    <div className="grid grid-cols-3 gap-2 text-center">
+                      <div className="rounded-md border border-border bg-background p-2">
+                        <p className="text-xs text-muted-foreground">Projetos no arquivo</p>
+                        <p className="text-lg font-semibold text-foreground">{preview.incoming.projetos}</p>
+                      </div>
+                      <div className="rounded-md border border-border bg-background p-2">
+                        <p className="text-xs text-muted-foreground">Tarefas no arquivo</p>
+                        <p className="text-lg font-semibold text-foreground">{preview.incoming.tarefas}</p>
+                      </div>
+                      <div className="rounded-md border border-border bg-background p-2">
+                        <p className="text-xs text-muted-foreground">Recursos no arquivo</p>
+                        <p className="text-lg font-semibold text-foreground">{preview.incoming.recursos}</p>
+                      </div>
+                    </div>
+                    {impactEntries.length ? (
+                      <div className="grid gap-1.5 text-sm">
+                        {impactEntries.map(([key, value]) => (
+                          <div key={key} className="flex items-center justify-between gap-3">
+                            <span className="text-muted-foreground">{impactLabel[key] || key}</span>
+                            <span className="font-medium text-foreground">{value}</span>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-sm text-muted-foreground">Nenhuma alteração relevante encontrada na prévia.</p>
+                    )}
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground">A prévia será exibida antes da confirmação.</p>
+                )}
+              </div>
+            ) : null}
+
             <div className="rounded-lg border border-warning/30 bg-warning/10 p-3 text-sm text-foreground">
               Digite <strong>{expectedPhrase}</strong> para confirmar.
             </div>
@@ -207,13 +327,41 @@ export default function ExcelImport({ mode = "schedule" }: { mode?: ExcelImportM
                 autoComplete="off"
               />
             </div>
+
+            {isAdminFull ? (
+              <div className="space-y-3 rounded-lg border border-destructive/30 bg-destructive/10 p-3">
+                <p className="text-sm text-foreground">
+                  Esta ação só deve ser executada depois de salvar um backup recente e verificável do banco.
+                </p>
+                <div className="flex items-start gap-2">
+                  <Checkbox
+                    id="backup-acknowledged"
+                    checked={backupAcknowledged}
+                    onCheckedChange={(value) => setBackupAcknowledged(value === true)}
+                  />
+                  <Label htmlFor="backup-acknowledged" className="text-sm leading-5">
+                    Confirmo que existe backup recente salvo fora do ambiente de produção.
+                  </Label>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="backup-confirmation">Confirmação de backup</Label>
+                  <Input
+                    id="backup-confirmation"
+                    value={destructiveConfirmationText}
+                    onChange={(e) => setDestructiveConfirmationText(e.target.value)}
+                    placeholder={IMPORT_CONFIRMATION_PHRASES.adminBackup}
+                    autoComplete="off"
+                  />
+                </div>
+              </div>
+            ) : null}
           </div>
 
           <DialogFooter>
             <Button variant="outline" onClick={() => resetSelection()} disabled={loading}>
               Cancelar
             </Button>
-            <Button onClick={() => void handleConfirmImport()} disabled={!canConfirm || loading}>
+            <Button onClick={() => void handleConfirmImport()} disabled={!canConfirm || loading || previewLoading}>
               {loading ? "Importando..." : "Confirmar importação"}
             </Button>
           </DialogFooter>

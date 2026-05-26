@@ -41,6 +41,8 @@ const { parseMsProjectXml } = require("./utils/msProjectXml");
 const { logAudit } = require("./utils/audit");
 const { BASELINE_SOURCE_TYPES, createProjectBaseline } = require("./utils/baselines");
 const { withMysqlSsl } = require("./utils/mysqlConnection");
+const { buildExcelImportPreview } = require("./utils/excelImportPreview");
+const { buildMsProjectImportPreview } = require("./utils/msProjectImportPreview");
 const {
   ROLES,
   canWriteData,
@@ -63,6 +65,7 @@ const IMPORT_CONFIRM_PHRASES = {
   excel: "SUBSTITUIR TUDO",
   msProject: "SUBSTITUIR CRONOGRAMA",
 };
+const FULL_IMPORT_BACKUP_CONFIRMATION = "CONFIRMO BACKUP";
 
 function ensureDirectory(dirPath) {
   if (!fs.existsSync(dirPath)) fs.mkdirSync(dirPath, { recursive: true });
@@ -147,6 +150,17 @@ function requireImportConfirmation(req, options) {
   const confirmationText = sanitizeString(req.body?.confirmationText, 80).toUpperCase();
   if (mode !== options.mode || confirmationText !== options.phrase) {
     throw createHttpError(options.errorMessage, "IMPORT_CONFIRMATION_REQUIRED", 400);
+  }
+  if (options.requireBackupConfirmation) {
+    const destructiveConfirmation = sanitizeString(req.body?.destructiveConfirmation, 80).toUpperCase();
+    const backupAcknowledged = String(req.body?.backupAcknowledged || "").toLowerCase() === "true";
+    if (!backupAcknowledged || destructiveConfirmation !== FULL_IMPORT_BACKUP_CONFIRMATION) {
+      throw createHttpError(
+        `Importação completa bloqueada. Confirme que há backup recente digitando "${FULL_IMPORT_BACKUP_CONFIRMATION}" e marcando a confirmação de backup.`,
+        "IMPORT_BACKUP_CONFIRMATION_REQUIRED",
+        400
+      );
+    }
   }
 }
 
@@ -544,6 +558,43 @@ const uploadMsProject = multer({
   },
 });
 
+app.post("/api/import-excel/preview", requireAuth, requireImportAccess, upload.single("file"), async (req, res) => {
+  if (!req.file) return res.status(400).json({ error: "Nenhum arquivo enviado", code: "NO_FILE" });
+
+  const filePath = req.file.path;
+
+  try {
+    assertExcelFileIntegrity(req.file);
+    const workbook = new ExcelJS.Workbook();
+    await workbook.xlsx.readFile(filePath);
+
+    const conn = await pool.getConnection();
+    try {
+      const preview = await buildExcelImportPreview({
+        workbook,
+        file: req.file,
+        conn,
+        authUser: req.authUser,
+        roles: ROLES,
+        maxRows: MAX_ROWS,
+        importConfirmPhrases: IMPORT_CONFIRM_PHRASES,
+        fullImportBackupConfirmation: FULL_IMPORT_BACKUP_CONFIRMATION,
+      });
+      return res.json(preview);
+    } finally {
+      conn.release();
+    }
+  } catch (err) {
+    console.error("Import preview error:", err);
+    res.status(err.status || 500).json({
+      error: err.status ? err.message : "Erro ao gerar prévia da importação",
+      code: err.code || "IMPORT_PREVIEW_ERROR",
+    });
+  } finally {
+    try { fs.unlinkSync(filePath); } catch (_) {}
+  }
+});
+
 app.post("/api/import-excel", requireAuth, requireImportAccess, upload.single("file"), async (req, res) => {
   if (!req.file) return res.status(400).json({ error: "Nenhum arquivo enviado", code: "NO_FILE" });
 
@@ -577,6 +628,7 @@ app.post("/api/import-excel", requireAuth, requireImportAccess, upload.single("f
           mode: "replace_all",
           phrase: IMPORT_CONFIRM_PHRASES.excel,
           errorMessage: `Confirme a operação digitando "${IMPORT_CONFIRM_PHRASES.excel}" para substituir todos os dados importáveis.`,
+          requireBackupConfirmation: true,
         });
 
     const conn = await pool.getConnection();
@@ -869,6 +921,40 @@ app.post("/api/import-excel", requireAuth, requireImportAccess, upload.single("f
     res.status(err.status || 500).json({
       error: err.status ? err.message : "Erro ao importar planilha",
       code: err.code || "IMPORT_ERROR",
+    });
+  } finally {
+    try { fs.unlinkSync(filePath); } catch (_) {}
+  }
+});
+
+app.post("/api/import-ms-project/preview", requireAuth, requireImportAccess, uploadMsProject.single("file"), async (req, res) => {
+  if (!req.file) return res.status(400).json({ error: "Nenhum arquivo XML enviado", code: "NO_FILE" });
+
+  const filePath = req.file.path;
+  try {
+    assertXmlFileIntegrity(req.file);
+    const xmlContent = fs.readFileSync(filePath, "utf8");
+    if (/<!DOCTYPE/i.test(xmlContent)) {
+      throw createHttpError("Arquivos XML com DOCTYPE não são permitidos", "FILE_XML_UNSAFE", 415);
+    }
+    const parsed = parseMsProjectXml(xmlContent);
+    const conn = await pool.getConnection();
+    try {
+      const preview = await buildMsProjectImportPreview({
+        parsed,
+        file: req.file,
+        conn,
+        importConfirmPhrases: IMPORT_CONFIRM_PHRASES,
+      });
+      return res.json(preview);
+    } finally {
+      conn.release();
+    }
+  } catch (err) {
+    console.error("MS Project preview error:", err);
+    res.status(err.status || 500).json({
+      error: err.status ? err.message : "Erro ao gerar prévia da importação XML do MS Project",
+      code: err.code || "IMPORT_MS_PROJECT_PREVIEW",
     });
   } finally {
     try { fs.unlinkSync(filePath); } catch (_) {}

@@ -75,6 +75,27 @@ export interface ProjectTemplate {
   updatedAt?: string;
 }
 
+export interface ExcelImportPreview {
+  file: {
+    originalName: string;
+    mimeType: string;
+    size: number;
+  };
+  importType: "schedule" | "admin_full" | "ms_project_xml";
+  importMode: "replace_project" | "replace_all";
+  projectName?: string;
+  projectId?: number | null;
+  incoming: {
+    projetos: number;
+    tarefas: number;
+    recursos: number;
+  };
+  existing: Record<string, number | boolean>;
+  impact: Record<string, number>;
+  requiredConfirmation: string;
+  requiredBackupConfirmation?: string;
+}
+
 export const AUTH_TOKEN_STORAGE_KEY = "abc_pm_auth_token";
 const IMPORT_CONFIRMATION_PHRASES = {
   excel: "SUBSTITUIR TUDO",
@@ -453,16 +474,59 @@ export async function deleteRecurso(id: number): Promise<void> {
 }
 
 // ===== IMPORT & HEALTH =====
+export async function previewExcelImport(file: File): Promise<ExcelImportPreview> {
+  if (!isApiEnabled()) throw new Error("API não configurada. Defina VITE_API_URL no .env");
+  const formData = new FormData();
+  formData.append("file", file);
+  const authToken = getStoredToken();
+  const res = await fetch(`${API_BASE_URL}/api/import-excel/preview`, {
+    method: "POST",
+    body: formData,
+    headers: authToken ? { Authorization: `Bearer ${authToken}` } : undefined,
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: "Erro ao gerar prévia da importação" }));
+    throw new Error(err.error || "Erro ao gerar prévia da importação");
+  }
+  return res.json();
+}
+
+export async function previewMsProjectImport(file: File): Promise<ExcelImportPreview> {
+  if (!isApiEnabled()) throw new Error("API não configurada. A importação do MS Project exige backend ativo.");
+  const formData = new FormData();
+  formData.append("file", file);
+  const authToken = getStoredToken();
+  const res = await fetch(`${API_BASE_URL}/api/import-ms-project/preview`, {
+    method: "POST",
+    body: formData,
+    headers: authToken ? { Authorization: `Bearer ${authToken}` } : undefined,
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: "Erro ao gerar prévia da importação XML do MS Project" }));
+    throw new Error(err.error || "Erro ao gerar prévia da importação XML do MS Project");
+  }
+  return res.json();
+}
+
 export async function importExcel(
   file: File,
-  options: { mode?: "replace_all" | "replace_project" } = {}
+  options: {
+    mode?: "replace_all" | "replace_project";
+    confirmationText?: string;
+    destructiveConfirmation?: string;
+    backupAcknowledged?: boolean;
+  } = {}
 ): Promise<{ success: boolean; imported: { projetos: number; tarefas: number; recursos: number } }> {
   if (!isApiEnabled()) throw new Error("API não configurada. Defina VITE_API_URL no .env");
   const mode = options.mode || "replace_all";
   const formData = new FormData();
   formData.append("file", file);
   formData.append("importMode", mode);
-  formData.append("confirmationText", mode === "replace_project" ? IMPORT_CONFIRMATION_PHRASES.schedule : IMPORT_CONFIRMATION_PHRASES.excel);
+  formData.append("confirmationText", options.confirmationText || (mode === "replace_project" ? IMPORT_CONFIRMATION_PHRASES.schedule : IMPORT_CONFIRMATION_PHRASES.excel));
+  if (mode === "replace_all") {
+    formData.append("destructiveConfirmation", options.destructiveConfirmation || "");
+    formData.append("backupAcknowledged", options.backupAcknowledged ? "true" : "false");
+  }
   const authToken = getStoredToken();
   const res = await fetch(`${API_BASE_URL}/api/import-excel`, {
     method: "POST",
