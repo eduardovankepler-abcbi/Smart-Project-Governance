@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import Header from "@/components/Header";
 import { useData, formatCurrency } from "@/contexts/DataContext";
@@ -12,6 +12,8 @@ import { getTaskResourceNames } from "@/utils/projectModel";
 import BaselineGovernancePanel from "@/components/BaselineGovernancePanel";
 import ChartPreviewModal from "@/components/ChartPreviewModal";
 import { useAuth } from "@/contexts/AuthContext";
+import * as api from "@/services/api";
+import type { Comentario } from "@/data/projectData";
 
 const COLORS = [
   "hsl(0, 78%, 45%)",
@@ -33,11 +35,32 @@ function parseDate(dateStr: string): Date | null {
   return isNaN(d.getTime()) ? null : d;
 }
 
+function formatDueDate(value?: string) {
+  if (!value) return "Sem prazo";
+  const date = new Date(`${value}T00:00:00`);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleDateString("pt-BR");
+}
+
+const ACTIONABLE_LABELS: Record<NonNullable<Comentario["commentType"]>, string> = {
+  comment: "Comentário",
+  decision: "Decisão",
+  action: "Pendência",
+  risk: "Risco",
+  issue: "Impedimento",
+};
+
+function normalizeActionableType(value?: string): NonNullable<Comentario["commentType"]> {
+  return value === "decision" || value === "action" || value === "risk" || value === "issue" ? value : "comment";
+}
+
 export default function DashboardPage() {
   const { projetos, tarefas, getUniqueProjetos } = useData();
   const { user } = useAuth();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
+  const [openActionItems, setOpenActionItems] = useState<Comentario[]>([]);
+  const [loadingActionItems, setLoadingActionItems] = useState(false);
   const filterProjeto = searchParams.get("projeto") || "all";
   const activeTab = searchParams.get("tab") === "curva-s" ? "curva-s" : "resumo";
   const projetosUnicos = useMemo(() => getUniqueProjetos(), [getUniqueProjetos]);
@@ -56,6 +79,33 @@ export default function DashboardPage() {
     () => projetos.find((project) => project.projeto === filterProjeto) || null,
     [filterProjeto, projetos]
   );
+
+  useEffect(() => {
+    let active = true;
+    async function loadOpenActionItems() {
+      setLoadingActionItems(true);
+      try {
+        const payload = await api.getComentarios({
+          projectId: selectedProject?.id,
+          resolutionStatus: "open",
+        });
+        if (!active) return;
+        const actionable = (Array.isArray(payload) ? payload : [])
+          .filter((item) => normalizeActionableType(item.commentType) !== "comment")
+          .slice(0, 6);
+        setOpenActionItems(actionable);
+      } catch (error) {
+        if (active) setOpenActionItems([]);
+        console.error("Error loading open action items:", error);
+      } finally {
+        if (active) setLoadingActionItems(false);
+      }
+    }
+    loadOpenActionItems();
+    return () => {
+      active = false;
+    };
+  }, [selectedProject?.id]);
 
   const statusData = useMemo(() => {
     const counts: Record<string, number> = {};
@@ -348,6 +398,46 @@ export default function DashboardPage() {
           </TabsList>
 
           <TabsContent value="resumo" className="space-y-6">
+            <Card className="border-border/80 bg-card/[0.92] shadow-[0_18px_40px_-32px_rgba(15,23,42,0.42)]">
+              <CardContent className="space-y-4 p-5">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div className="space-y-1">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">Governança</p>
+                    <h3 className="text-lg font-display font-semibold text-foreground">Acionáveis abertos</h3>
+                  </div>
+                  <Button variant="outline" size="sm" className="gap-1.5" onClick={() => navigate("/historico?tab=comentarios")}>
+                    Ver histórico
+                    <ArrowUpRight size={14} />
+                  </Button>
+                </div>
+
+                {loadingActionItems ? (
+                  <p className="text-sm text-muted-foreground">Carregando pendências, riscos e impedimentos...</p>
+                ) : openActionItems.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">Nenhum acionável aberto no recorte atual.</p>
+                ) : (
+                  <div className="grid gap-3 lg:grid-cols-2">
+                    {openActionItems.map((item, index) => {
+                      const type = normalizeActionableType(item.commentType);
+                      return (
+                        <div key={item.id || `${item.projectName}-${index}`} className="rounded-lg border border-border bg-background/60 p-3">
+                          <div className="mb-2 flex flex-wrap items-center gap-2">
+                            <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${type === "risk" || type === "issue" ? "bg-destructive text-destructive-foreground" : "bg-secondary text-secondary-foreground"}`}>
+                              {ACTIONABLE_LABELS[type]}
+                            </span>
+                            {item.projectName ? <span className="text-xs text-muted-foreground">{item.projectName}</span> : null}
+                            <span className="text-xs text-muted-foreground">{formatDueDate(item.dueDate)}</span>
+                          </div>
+                          <p className="line-clamp-2 text-sm text-foreground">{item.content}</p>
+                          {item.ownerName ? <p className="mt-2 text-xs text-muted-foreground">Responsável: {item.ownerName}</p> : null}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               <Card className="border-border/80 bg-card/[0.92] shadow-[0_18px_40px_-32px_rgba(15,23,42,0.42)]">
                 <CardContent className="p-5">
