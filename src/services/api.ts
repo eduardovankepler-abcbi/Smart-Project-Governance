@@ -343,11 +343,18 @@ export async function deleteAlocacao(id: number): Promise<void> {
 }
 
 // ===== COMENTÁRIOS =====
-export async function getComentarios(params?: { projectId?: number; taskId?: string }): Promise<Comentario[]> {
+export async function getComentarios(params?: {
+  projectId?: number;
+  taskId?: string;
+  commentType?: Comentario["commentType"] | "all";
+  resolutionStatus?: Comentario["resolutionStatus"] | "all";
+}): Promise<Comentario[]> {
   if (!isApiEnabled()) return [];
   const query = new URLSearchParams();
   if (params?.projectId) query.set("projectId", String(params.projectId));
   if (params?.taskId) query.set("taskId", params.taskId);
+  if (params?.commentType && params.commentType !== "all") query.set("commentType", params.commentType);
+  if (params?.resolutionStatus && params.resolutionStatus !== "all") query.set("resolutionStatus", params.resolutionStatus);
   return fetchJson<Comentario[]>(`/api/comentarios${query.toString() ? `?${query.toString()}` : ""}`);
 }
 

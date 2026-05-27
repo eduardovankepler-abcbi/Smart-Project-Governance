@@ -59,6 +59,10 @@ module.exports = function (pool, auth) {
     try {
       const projectId = sanitizeInt(req.query.projectId);
       const taskId = sanitizeString(req.query.taskId, 20);
+      const rawCommentType = sanitizeString(req.query.commentType, 30).toLowerCase();
+      const rawResolutionStatus = sanitizeString(req.query.resolutionStatus, 20).toLowerCase();
+      const commentType = normalizeCommentType(rawCommentType);
+      const resolutionStatus = normalizeResolutionStatus(rawResolutionStatus);
       const access = await getAccessibleProjectIdsFilter(req.authUser);
 
       const conditions = [];
@@ -75,6 +79,14 @@ module.exports = function (pool, auth) {
       if (taskId) {
         conditions.push("c.task_id = ?");
         params.push(taskId);
+      }
+      if (rawCommentType && rawCommentType !== "all") {
+        conditions.push("c.comment_type = ?");
+        params.push(commentType);
+      }
+      if (rawResolutionStatus && rawResolutionStatus !== "all") {
+        conditions.push("c.resolution_status = ?");
+        params.push(resolutionStatus);
       }
 
       const whereClause = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";

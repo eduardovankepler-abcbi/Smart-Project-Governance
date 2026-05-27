@@ -40,9 +40,11 @@ export default function HistoricoPage() {
   const [taskId, setTaskId] = useState<string>("all");
   const [content, setContent] = useState("");
   const [commentType, setCommentType] = useState<NonNullable<Comentario["commentType"]>>("comment");
+  const [commentTypeFilter, setCommentTypeFilter] = useState<NonNullable<Comentario["commentType"]> | "all">("all");
   const [ownerName, setOwnerName] = useState("");
   const [dueDate, setDueDate] = useState("");
   const [resolutionStatus, setResolutionStatus] = useState<NonNullable<Comentario["resolutionStatus"]>>("open");
+  const [resolutionStatusFilter, setResolutionStatusFilter] = useState<NonNullable<Comentario["resolutionStatus"]> | "all">("all");
   const [editingComment, setEditingComment] = useState<Comentario | null>(null);
   const [auditSearch, setAuditSearch] = useState("");
   const [auditEntityType, setAuditEntityType] = useState("all");
@@ -65,6 +67,8 @@ export default function HistoricoPage() {
       const payload = await api.getComentarios({
         projectId: projectId !== "all" ? Number(projectId) : undefined,
         taskId: entityType === "tarefa" && taskId !== "all" ? taskId : undefined,
+        commentType: commentTypeFilter,
+        resolutionStatus: resolutionStatusFilter,
       });
       setComments(payload);
     } catch (error) {
@@ -93,7 +97,7 @@ export default function HistoricoPage() {
 
   useEffect(() => {
     loadComments();
-  }, [projectId, taskId, entityType]);
+  }, [projectId, taskId, entityType, commentTypeFilter, resolutionStatusFilter]);
 
   useEffect(() => {
     loadAudit();
@@ -115,6 +119,7 @@ export default function HistoricoPage() {
     risk: "Risco",
     issue: "Impedimento",
   };
+  const openActionableCount = comments.filter((item) => item.resolutionStatus !== "resolved" && item.commentType && item.commentType !== "comment").length;
 
   const handleSaveComment = async () => {
     try {
@@ -221,6 +226,29 @@ export default function HistoricoPage() {
                         </SelectContent>
                     </Select>
                   ) : null}
+                  <Select value={commentTypeFilter} onValueChange={(value) => setCommentTypeFilter(value as NonNullable<Comentario["commentType"]> | "all")}>
+                    <SelectTrigger className="w-48"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todos os tipos</SelectItem>
+                      <SelectItem value="comment">Comentários</SelectItem>
+                      <SelectItem value="decision">Decisões</SelectItem>
+                      <SelectItem value="action">Pendências</SelectItem>
+                      <SelectItem value="risk">Riscos</SelectItem>
+                      <SelectItem value="issue">Impedimentos</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Select value={resolutionStatusFilter} onValueChange={(value) => setResolutionStatusFilter(value as NonNullable<Comentario["resolutionStatus"]> | "all")}>
+                    <SelectTrigger className="w-44"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todos os status</SelectItem>
+                      <SelectItem value="open">Abertos</SelectItem>
+                      <SelectItem value="resolved">Resolvidos</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="flex flex-wrap gap-2 text-sm text-muted-foreground">
+                  <Badge variant="outline">{comments.length} registros</Badge>
+                  <Badge variant={openActionableCount > 0 ? "destructive" : "secondary"}>{openActionableCount} acionáveis abertos</Badge>
                 </div>
 
                 {canWrite ? (
