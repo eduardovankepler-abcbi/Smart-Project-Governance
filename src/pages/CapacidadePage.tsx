@@ -31,6 +31,7 @@ interface CapacityRow {
   funcao: string;
   seniority: string;
   capacityUnits: number;
+  capacityHours: number;
   allocatedUnits: number;
   occupancyPct: number;
   overloadPct: number;
@@ -51,6 +52,8 @@ interface CapacityPeriod {
   start: Date | null;
   end: Date | null;
 }
+
+const HOURS_PER_WORKDAY = 8;
 
 function toIsoDateInput(date: Date) {
   const year = date.getFullYear();
@@ -135,6 +138,30 @@ function calculateOverlapFactor(startDate: Date | null, finishDate: Date | null,
   const totalDays = Math.max(Math.round((normalizedTaskEnd.getTime() - normalizedTaskStart.getTime()) / dayMs) + 1, 1);
   const overlapDays = Math.max(Math.round((overlapEnd.getTime() - overlapStart.getTime()) / dayMs) + 1, 0);
   return Math.min(overlapDays / totalDays, 1);
+}
+
+function countWorkingDays(start: Date | null, end: Date | null) {
+  if (!start || !end) return 0;
+  const first = new Date(Math.min(start.getTime(), end.getTime()));
+  const last = new Date(Math.max(start.getTime(), end.getTime()));
+  let days = 0;
+  for (let cursor = new Date(first); cursor.getTime() <= last.getTime(); cursor.setDate(cursor.getDate() + 1)) {
+    const day = cursor.getDay();
+    if (day !== 0 && day !== 6) days += 1;
+  }
+  return days;
+}
+
+function getCapacityWindow(assignments: CapacityAssignment[], period: CapacityPeriod): CapacityPeriod {
+  if (period.start && period.end) return period;
+  const dates = assignments
+    .flatMap((assignment) => [assignment.startDate, assignment.finishDate])
+    .filter((date): date is Date => !!date);
+  if (!dates.length) return { start: null, end: null };
+  return {
+    start: new Date(Math.min(...dates.map((date) => date.getTime()))),
+    end: new Date(Math.max(...dates.map((date) => date.getTime()))),
+  };
 }
 
 function getStatusMeta(occupancyPct: number) {
@@ -243,16 +270,18 @@ export default function CapacidadePage() {
         )).sort();
 
         const capacityUnits = Number(resource.maxUnits || 1);
-        const allocatedUnits = assignments.reduce((sum, assignment) => sum + Number(assignment.units || 0), 0);
         const plannedWork = assignments.reduce((sum, assignment) => sum + Number(assignment.work || 0), 0);
         const actualWork = assignments.reduce((sum, assignment) => sum + Number(assignment.actualWork || 0), 0);
         const remainingWork = assignments.reduce((sum, assignment) => sum + Number(assignment.remainingWork || 0), 0);
+        const capacityWindow = getCapacityWindow(assignments, selectedPeriod);
+        const capacityHours = countWorkingDays(capacityWindow.start, capacityWindow.end) * HOURS_PER_WORKDAY * capacityUnits;
+        const occupancyPct = capacityHours > 0 ? (plannedWork / capacityHours) * 100 : 0;
+        const allocatedUnits = capacityUnits * (occupancyPct / 100);
         const estimatedCost = assignments.reduce((sum, assignment) => {
           const explicitCost = Number(assignment.cost || 0);
           if (explicitCost > 0) return sum + explicitCost;
           return sum + (Number(assignment.work || 0) * Number(resource.standardRate || 0));
         }, 0);
-        const occupancyPct = capacityUnits > 0 ? (allocatedUnits / capacityUnits) * 100 : 0;
 
         return {
           id: resource.id,
@@ -260,6 +289,7 @@ export default function CapacidadePage() {
           funcao: resource.funcao || "—",
           seniority: resource.seniority || "—",
           capacityUnits,
+          capacityHours,
           allocatedUnits,
           occupancyPct,
           overloadPct: Math.max(occupancyPct - 100, 0),
@@ -470,7 +500,8 @@ export default function CapacidadePage() {
                       </div>
                       <div className="flex flex-wrap gap-x-5 gap-y-1 text-xs text-muted-foreground">
                         <span>Capacidade cadastrada: <strong className="text-foreground">{Math.round(row.capacityUnits * 100)}%</strong></span>
-                        <span>Capacidade alocada: <strong className="text-foreground">{Math.round(row.allocatedUnits * 100)}%</strong></span>
+                        <span>Capacidade alocada: <strong className="text-foreground">{Math.round(row.occupancyPct)}%</strong></span>
+                        <span>Horas disponíveis: <strong className="text-foreground">{row.capacityHours.toFixed(1)}h</strong></span>
                         <span>Projetos ativos: <strong className="text-foreground">{row.projectCount}</strong></span>
                         <span>Tarefas com alocação: <strong className="text-foreground">{row.taskCount}</strong></span>
                         <span>Custo estimado: <strong className="text-foreground">{formatCurrency(row.estimatedCost)}</strong></span>
