@@ -104,6 +104,17 @@ test("MS Project preview scopes replacement to existing XML project", async () =
       assert.deepEqual(params, [["Maria", "Joao"]]);
       return [[{ nome: "Maria" }]];
     }
+    if (sql.includes("FROM project_baselines")) {
+      assert.deepEqual(params, [77]);
+      return [[{
+        id: 11,
+        baseline_number: 1,
+        baseline_name: "LB 01 - Oficial",
+        task_count: 3,
+        total_planned_effort: 30,
+        total_planned_cost: 0,
+      }]];
+    }
     throw new Error(`Unexpected SQL: ${sql}`);
   });
 
@@ -125,6 +136,12 @@ test("MS Project preview scopes replacement to existing XML project", async () =
   assert.equal(preview.impact.assignmentsToReplace, 6);
   assert.equal(preview.impact.resourcesToReuse, 1);
   assert.equal(preview.impact.resourcesToCreate, 1);
+  assert.equal(preview.baselineImpact.hasOfficialBaseline, true);
+  assert.equal(preview.baselineImpact.baselineId, 11);
+  assert.equal(preview.baselineImpact.incomingTaskCount, 2);
+  assert.equal(preview.baselineImpact.taskCountDelta, -1);
+  assert.equal(preview.baselineImpact.incomingPlannedEffort, 24);
+  assert.equal(preview.baselineImpact.plannedEffortDelta, -6);
   assert.equal(preview.requiredConfirmation, "SUBSTITUIR CRONOGRAMA");
 });
 

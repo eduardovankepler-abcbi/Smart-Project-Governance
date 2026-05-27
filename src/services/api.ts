@@ -92,6 +92,21 @@ export interface ExcelImportPreview {
   };
   existing: Record<string, number | boolean>;
   impact: Record<string, number>;
+  baselineImpact?: {
+    hasOfficialBaseline: boolean;
+    baselineId?: number;
+    baselineNumber?: number;
+    baselineName?: string;
+    baselineTaskCount?: number;
+    incomingTaskCount: number;
+    taskCountDelta?: number;
+    baselinePlannedEffort?: number;
+    incomingPlannedEffort: number;
+    plannedEffortDelta?: number;
+    baselinePlannedCost?: number;
+    incomingPlannedCost: number;
+    plannedCostDelta?: number;
+  };
   requiredConfirmation: string;
   requiredBackupConfirmation?: string;
 }

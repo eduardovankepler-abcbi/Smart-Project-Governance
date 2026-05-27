@@ -81,6 +81,17 @@ test("Excel preview scopes schedule XLSX replacement to one project", async () =
       assert.deepEqual(params, [["Flávio", "Eduardo"]]);
       return [[{ nome: "Flávio" }]];
     }
+    if (sql.includes("FROM project_baselines")) {
+      assert.deepEqual(params, [42]);
+      return [[{
+        id: 8,
+        baseline_number: 2,
+        baseline_name: "LB 02 - Aprovada",
+        task_count: 1,
+        total_planned_effort: 40,
+        total_planned_cost: 1000,
+      }]];
+    }
     throw new Error(`Unexpected SQL: ${sql}`);
   });
 
@@ -100,6 +111,13 @@ test("Excel preview scopes schedule XLSX replacement to one project", async () =
   assert.equal(preview.impact.assignmentsToReplace, 5);
   assert.equal(preview.impact.resourcesToReuse, 1);
   assert.equal(preview.impact.resourcesToCreate, 1);
+  assert.equal(preview.baselineImpact.hasOfficialBaseline, true);
+  assert.equal(preview.baselineImpact.baselineId, 8);
+  assert.equal(preview.baselineImpact.incomingTaskCount, 2);
+  assert.equal(preview.baselineImpact.taskCountDelta, 1);
+  assert.equal(preview.baselineImpact.incomingPlannedEffort, 88);
+  assert.equal(preview.baselineImpact.plannedEffortDelta, 48);
+  assert.equal(preview.baselineImpact.plannedCostDelta, -1000);
   assert.equal(preview.requiredConfirmation, "SUBSTITUIR CRONOGRAMA");
 });
 

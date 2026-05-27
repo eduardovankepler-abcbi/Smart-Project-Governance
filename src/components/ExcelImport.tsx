@@ -220,6 +220,14 @@ export default function ExcelImport({ mode = "schedule" }: { mode?: ExcelImportM
   const impactEntries = preview
     ? Object.entries(preview.impact).filter(([, value]) => Number(value) > 0)
     : [];
+  const baselineImpact = preview?.baselineImpact;
+  const formatNumber = (value?: number) => Number(value || 0).toLocaleString("pt-BR", { maximumFractionDigits: 1 });
+  const formatCurrency = (value?: number) => Number(value || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+  const formatDelta = (value?: number, suffix = "") => {
+    const amount = Number(value || 0);
+    const sign = amount > 0 ? "+" : "";
+    return `${sign}${formatNumber(amount)}${suffix}`;
+  };
 
   return (
     <>
@@ -306,6 +314,38 @@ export default function ExcelImport({ mode = "schedule" }: { mode?: ExcelImportM
                     ) : (
                       <p className="text-sm text-muted-foreground">Nenhuma alteração relevante encontrada na prévia.</p>
                     )}
+                    {baselineImpact ? (
+                      <div className="rounded-md border border-border bg-background p-3 text-sm">
+                        {baselineImpact.hasOfficialBaseline ? (
+                          <div className="space-y-2">
+                            <div className="flex flex-wrap items-center justify-between gap-2">
+                              <span className="font-medium text-foreground">Comparação com baseline oficial</span>
+                              <Badge variant="outline">
+                                LB {baselineImpact.baselineNumber} · {baselineImpact.baselineName}
+                              </Badge>
+                            </div>
+                            <div className="grid gap-1.5">
+                              <div className="flex items-center justify-between gap-3">
+                                <span className="text-muted-foreground">Variação de tarefas</span>
+                                <span className="font-medium text-foreground">{formatDelta(baselineImpact.taskCountDelta)}</span>
+                              </div>
+                              <div className="flex items-center justify-between gap-3">
+                                <span className="text-muted-foreground">Variação de esforço</span>
+                                <span className="font-medium text-foreground">{formatDelta(baselineImpact.plannedEffortDelta, "h")}</span>
+                              </div>
+                              <div className="flex items-center justify-between gap-3">
+                                <span className="text-muted-foreground">Variação de custo</span>
+                                <span className="font-medium text-foreground">{formatCurrency(baselineImpact.plannedCostDelta)}</span>
+                              </div>
+                            </div>
+                          </div>
+                        ) : (
+                          <p className="text-muted-foreground">
+                            Nenhuma baseline oficial encontrada para comparar este replanejamento.
+                          </p>
+                        )}
+                      </div>
+                    ) : null}
                   </div>
                 ) : (
                   <p className="text-sm text-muted-foreground">A prévia será exibida antes da confirmação.</p>

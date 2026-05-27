@@ -1,4 +1,5 @@
 const { sanitizeString } = require("./parsing");
+const { buildBaselineImpact } = require("./replanImpact");
 
 async function getCount(conn, sql, params = []) {
   const [[row]] = await conn.query(sql, params);
@@ -38,6 +39,10 @@ async function buildMsProjectImportPreview({
     const [rows] = await conn.query("SELECT nome FROM recursos WHERE nome IN (?)", [resourceNames]);
     existingResourceNames = rows.map((row) => row.nome);
   }
+  const baselineImpact = await buildBaselineImpact(conn, existingProjectId, parsed.tasks.map((task) => ({
+    plannedEffort: task.esforcoPlanej,
+    plannedCost: task.valorPrevisto,
+  })));
 
   return {
     file: getUploadedFileMetadata(file),
@@ -69,6 +74,7 @@ async function buildMsProjectImportPreview({
       resourcesToReuse: existingResourceNames.length,
       resourcesToDelete: 0,
     },
+    baselineImpact,
     requiredConfirmation: importConfirmPhrases.msProject,
   };
 }

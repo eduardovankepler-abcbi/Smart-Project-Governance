@@ -5,7 +5,10 @@ const {
   sheetToObjects,
   findSheetByColumns,
   cleanTaskName,
+  parseDurationHours,
+  sanitizeNumber,
 } = require("./parsing");
+const { buildBaselineImpact } = require("./replanImpact");
 
 function createPreviewError(message, code, status = 400) {
   const error = new Error(message);
@@ -26,6 +29,13 @@ function getUploadedFileMetadata(file) {
     mimeType: sanitizeString(file.mimetype, 120),
     size: Number(file.size || 0),
   };
+}
+
+function summarizeScheduleRows(rows) {
+  return rows.map((row) => ({
+    plannedEffort: parseDurationHours(col(row, "Duration", "Duração", "Duracao")),
+    plannedCost: sanitizeNumber(col(row, "Valor Previsto", "valor_previsto")),
+  }));
 }
 
 async function buildExcelImportPreview({
@@ -95,6 +105,7 @@ async function buildExcelImportPreview({
       const [rows] = await conn.query("SELECT nome FROM recursos WHERE nome IN (?)", [resourceNameList]);
       existingResourceNames = rows.map((row) => row.nome);
     }
+    const baselineImpact = await buildBaselineImpact(conn, existingProjectId, summarizeScheduleRows(edrawScheduleRows));
 
     return {
       file: fileMetadata,
@@ -126,6 +137,7 @@ async function buildExcelImportPreview({
         resourcesToReuse: existingResourceNames.length,
         resourcesToDelete: 0,
       },
+      baselineImpact,
       requiredConfirmation: importConfirmPhrases.msProject,
     };
   }
