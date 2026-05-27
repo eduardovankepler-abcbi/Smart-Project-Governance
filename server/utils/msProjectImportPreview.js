@@ -75,6 +75,7 @@ async function buildMsProjectImportPreview({
       resourcesToDelete: 0,
     },
     baselineImpact,
+    requiresReplanJustification: baselineImpact.hasOfficialBaseline,
     requiredConfirmation: importConfirmPhrases.msProject,
   };
 }

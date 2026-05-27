@@ -107,6 +107,7 @@ export interface ExcelImportPreview {
     incomingPlannedCost: number;
     plannedCostDelta?: number;
   };
+  requiresReplanJustification?: boolean;
   requiredConfirmation: string;
   requiredBackupConfirmation?: string;
 }
@@ -530,6 +531,7 @@ export async function importExcel(
     confirmationText?: string;
     destructiveConfirmation?: string;
     backupAcknowledged?: boolean;
+    replanJustification?: string;
   } = {}
 ): Promise<{ success: boolean; imported: { projetos: number; tarefas: number; recursos: number } }> {
   if (!isApiEnabled()) throw new Error("API não configurada. Defina VITE_API_URL no .env");
@@ -542,6 +544,7 @@ export async function importExcel(
     formData.append("destructiveConfirmation", options.destructiveConfirmation || "");
     formData.append("backupAcknowledged", options.backupAcknowledged ? "true" : "false");
   }
+  if (options.replanJustification) formData.append("replanJustification", options.replanJustification);
   const authToken = getStoredToken();
   const res = await fetch(`${API_BASE_URL}/api/import-excel`, {
     method: "POST",
@@ -555,12 +558,13 @@ export async function importExcel(
   return res.json();
 }
 
-export async function importMsProject(file: File): Promise<{ success: boolean; imported: { project: string; projetos: number; tarefas: number; recursos: number } }> {
+export async function importMsProject(file: File, options: { replanJustification?: string } = {}): Promise<{ success: boolean; imported: { project: string; projetos: number; tarefas: number; recursos: number } }> {
   if (!isApiEnabled()) throw new Error("API não configurada. A importação do MS Project exige backend ativo.");
   const formData = new FormData();
   formData.append("file", file);
   formData.append("importMode", "replace_project");
   formData.append("confirmationText", IMPORT_CONFIRMATION_PHRASES.msProject);
+  if (options.replanJustification) formData.append("replanJustification", options.replanJustification);
   const authToken = getStoredToken();
   const res = await fetch(`${API_BASE_URL}/api/import-ms-project`, {
     method: "POST",

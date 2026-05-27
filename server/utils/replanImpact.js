@@ -1,5 +1,12 @@
 const { sanitizeInt, sanitizeNumber, sanitizeString } = require("./parsing");
 
+function createReplanError(status, message, code) {
+  const error = new Error(message);
+  error.status = status;
+  error.code = code;
+  return error;
+}
+
 function roundCurrency(value) {
   return Number(sanitizeNumber(value).toFixed(2));
 }
@@ -68,7 +75,29 @@ async function buildBaselineImpact(conn, projectId, incomingTasks = []) {
   };
 }
 
+async function requireReplanJustification(conn, projectId, justification) {
+  const baseline = await getOfficialBaseline(conn, projectId);
+  if (!baseline) return { hasOfficialBaseline: false, justification: "" };
+
+  const normalizedJustification = sanitizeString(justification, 4000);
+  if (!normalizedJustification) {
+    throw createReplanError(
+      400,
+      "Informe a justificativa do replanejamento para substituir um cronograma com baseline oficial",
+      "REPLAN_JUSTIFICATION_REQUIRED"
+    );
+  }
+
+  return {
+    hasOfficialBaseline: true,
+    baseline,
+    justification: normalizedJustification,
+  };
+}
+
 module.exports = {
   buildBaselineImpact,
+  getOfficialBaseline,
+  requireReplanJustification,
   summarizeIncomingTasks,
 };

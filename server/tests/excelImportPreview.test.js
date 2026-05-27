@@ -118,6 +118,7 @@ test("Excel preview scopes schedule XLSX replacement to one project", async () =
   assert.equal(preview.baselineImpact.incomingPlannedEffort, 88);
   assert.equal(preview.baselineImpact.plannedEffortDelta, 48);
   assert.equal(preview.baselineImpact.plannedCostDelta, -1000);
+  assert.equal(preview.requiresReplanJustification, true);
   assert.equal(preview.requiredConfirmation, "SUBSTITUIR CRONOGRAMA");
 });
 

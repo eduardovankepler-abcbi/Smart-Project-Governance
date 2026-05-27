@@ -142,6 +142,7 @@ test("MS Project preview scopes replacement to existing XML project", async () =
   assert.equal(preview.baselineImpact.taskCountDelta, -1);
   assert.equal(preview.baselineImpact.incomingPlannedEffort, 24);
   assert.equal(preview.baselineImpact.plannedEffortDelta, -6);
+  assert.equal(preview.requiresReplanJustification, true);
   assert.equal(preview.requiredConfirmation, "SUBSTITUIR CRONOGRAMA");
 });
 

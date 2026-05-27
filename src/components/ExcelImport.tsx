@@ -32,6 +32,7 @@ export default function ExcelImport({ mode = "schedule" }: { mode?: ExcelImportM
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [confirmationText, setConfirmationText] = useState("");
   const [destructiveConfirmationText, setDestructiveConfirmationText] = useState("");
+  const [replanJustification, setReplanJustification] = useState("");
   const [backupAcknowledged, setBackupAcknowledged] = useState(false);
   const [pendingFile, setPendingFile] = useState<File | null>(null);
   const [pendingImportKind, setPendingImportKind] = useState<PendingImportKind | null>(null);
@@ -49,6 +50,7 @@ export default function ExcelImport({ mode = "schedule" }: { mode?: ExcelImportM
     setPendingImportKind(null);
     setConfirmationText("");
     setDestructiveConfirmationText("");
+    setReplanJustification("");
     setBackupAcknowledged(false);
     setPreview(null);
     setPreviewLoading(false);
@@ -61,7 +63,7 @@ export default function ExcelImport({ mode = "schedule" }: { mode?: ExcelImportM
     try {
       if (isApiEnabled()) {
         if (ext === "xml") {
-          const result = await api.importMsProject(file);
+          const result = await api.importMsProject(file, { replanJustification });
           await refreshAll();
           toast({
             title: "Cronograma MS Project importado",
@@ -73,6 +75,7 @@ export default function ExcelImport({ mode = "schedule" }: { mode?: ExcelImportM
             confirmationText,
             destructiveConfirmation: destructiveConfirmationText,
             backupAcknowledged,
+            replanJustification,
           });
           await refreshAll();
           toast({
@@ -155,6 +158,7 @@ export default function ExcelImport({ mode = "schedule" }: { mode?: ExcelImportM
     setPendingImportKind(ext === "xml" ? "xml" : "excel");
     setConfirmationText("");
     setDestructiveConfirmationText("");
+    setReplanJustification("");
     setBackupAcknowledged(false);
     setPreview(null);
     setConfirmOpen(true);
@@ -189,10 +193,12 @@ export default function ExcelImport({ mode = "schedule" }: { mode?: ExcelImportM
       backupAcknowledged
       && destructiveConfirmationText.trim().toUpperCase() === IMPORT_CONFIRMATION_PHRASES.adminBackup
     );
+  const hasReplanJustification = !preview?.requiresReplanJustification || replanJustification.trim().length >= 10;
   const canConfirm = !!pendingFile
     && !!pendingImportKind
     && confirmationText.trim().toUpperCase() === expectedPhrase
-    && hasBackupConfirmation;
+    && hasBackupConfirmation
+    && hasReplanJustification;
 
   const handleConfirmImport = async () => {
     if (!pendingFile || !pendingImportKind) return;
@@ -367,6 +373,19 @@ export default function ExcelImport({ mode = "schedule" }: { mode?: ExcelImportM
                 autoComplete="off"
               />
             </div>
+
+            {preview?.requiresReplanJustification ? (
+              <div className="space-y-2">
+                <Label htmlFor="replan-justification">Justificativa do replanejamento</Label>
+                <Input
+                  id="replan-justification"
+                  value={replanJustification}
+                  onChange={(e) => setReplanJustification(e.target.value)}
+                  placeholder="Explique o motivo da substituição do cronograma"
+                  autoComplete="off"
+                />
+              </div>
+            ) : null}
 
             {isAdminFull ? (
               <div className="space-y-3 rounded-lg border border-destructive/30 bg-destructive/10 p-3">

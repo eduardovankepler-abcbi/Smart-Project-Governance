@@ -42,6 +42,7 @@ const { BASELINE_SOURCE_TYPES, createProjectBaseline } = require("./utils/baseli
 const { withMysqlSsl } = require("./utils/mysqlConnection");
 const { buildExcelImportPreview } = require("./utils/excelImportPreview");
 const { buildMsProjectImportPreview } = require("./utils/msProjectImportPreview");
+const { requireReplanJustification } = require("./utils/replanImpact");
 const { deriveTaskStatus } = require("./utils/statusRules");
 const { normalizeMaxUnits } = require("./utils/resourceCapacity");
 const {
@@ -624,6 +625,7 @@ app.post("/api/import-excel", requireAuth, requireImportAccess, upload.single("f
     const projetoSheet = workbook.getWorksheet("Projeto") || workbook.getWorksheet("Projetos");
     const edrawScheduleRows = edrawScheduleSheet ? sheetToObjects(edrawScheduleSheet) : [];
     const isScheduleImport = !projetoSheet && edrawScheduleRows.length > 0;
+    let replanProtection = { hasOfficialBaseline: false, justification: "" };
 
     if (!isScheduleImport && req.authUser?.role !== ROLES.ADMIN) {
       return res.status(403).json({
@@ -648,6 +650,17 @@ app.post("/api/import-excel", requireAuth, requireImportAccess, upload.single("f
     const conn = await pool.getConnection();
 
     try {
+      if (isScheduleImport) {
+        const rootRow = edrawScheduleRows[0];
+        const projectName = cleanTaskName(col(rootRow, "Task", "Tarefa")) || sanitizeString(req.file.originalname.replace(/\.(xlsx|xlsm)$/i, ""), 200);
+        const [existingProjectRows] = await conn.query("SELECT id FROM projetos WHERE projeto = ? LIMIT 1", [projectName]);
+        replanProtection = await requireReplanJustification(
+          conn,
+          existingProjectRows[0]?.id || null,
+          req.body?.replanJustification
+        );
+      }
+
       await conn.beginTransaction();
 
       let scheduleProjectName = "";
@@ -913,6 +926,18 @@ app.post("/api/import-excel", requireAuth, requireImportAccess, upload.single("f
       if (isSupabaseSyncEnabled()) {
         await syncFullSnapshot(pool);
       }
+      if (isScheduleImport && replanProtection.hasOfficialBaseline && scheduleProjectId) {
+        try {
+          await createProjectBaseline(pool, {
+            projectId: scheduleProjectId,
+            sourceType: BASELINE_SOURCE_TYPES.REPLAN,
+            justification: replanProtection.justification,
+            actor: req.authUser,
+          });
+        } catch (baselineError) {
+          console.error("Baseline replan creation after Excel import failed:", baselineError);
+        }
+      }
       await logImportEvent(req.authUser, {
         action: "import",
         entityType: "excel_import",
@@ -922,6 +947,8 @@ app.post("/api/import-excel", requireAuth, requireImportAccess, upload.single("f
           imported,
           file: fileMetadata,
           importMode: isScheduleImport ? "replace_project" : "replace_all",
+          replanJustification: replanProtection.justification || undefined,
+          baselineId: replanProtection.baseline?.id || undefined,
         },
       });
       res.json({ success: true, imported });
@@ -1006,8 +1033,15 @@ app.post("/api/import-ms-project", requireAuth, requireImportAccess, uploadMsPro
     }
     const parsed = parseMsProjectXml(xmlContent);
     const conn = await pool.getConnection();
+    let replanProtection = { hasOfficialBaseline: false, justification: "" };
 
     try {
+      const [existingProjectRows] = await conn.query("SELECT id FROM projetos WHERE projeto = ? LIMIT 1", [parsed.projectName]);
+      replanProtection = await requireReplanJustification(
+        conn,
+        existingProjectRows[0]?.id || null,
+        req.body?.replanJustification
+      );
       await conn.beginTransaction();
 
       let projectId = null;
@@ -1192,7 +1226,8 @@ app.post("/api/import-ms-project", requireAuth, requireImportAccess, uploadMsPro
         if (projectId) {
           await createProjectBaseline(pool, {
             projectId,
-            sourceType: BASELINE_SOURCE_TYPES.XML_IMPORT,
+            sourceType: replanProtection.hasOfficialBaseline ? BASELINE_SOURCE_TYPES.REPLAN : BASELINE_SOURCE_TYPES.XML_IMPORT,
+            justification: replanProtection.justification,
             actor: req.authUser,
           });
         }
@@ -1212,6 +1247,8 @@ app.post("/api/import-ms-project", requireAuth, requireImportAccess, uploadMsPro
           recursos: parsed.resources.length,
           file: fileMetadata,
           importMode: "replace_project",
+          replanJustification: replanProtection.justification || undefined,
+          baselineId: replanProtection.baseline?.id || undefined,
         },
       });
       res.json({
