@@ -50,10 +50,19 @@ export default function AlocacoesPage() {
 
   const handleSave = async (payload: Alocacao) => {
     try {
-      if (selectedAlocacao?.id) await api.updateAlocacao(selectedAlocacao.id, payload);
-      else await api.createAlocacao(payload);
+      const saved = selectedAlocacao?.id
+        ? await api.updateAlocacao(selectedAlocacao.id, payload)
+        : await api.createAlocacao(payload);
       await Promise.all([loadAlocacoes(), refreshTarefas()]);
-      toast({ title: selectedAlocacao ? "Alocação atualizada" : "Alocação criada" });
+      if (saved.capacityWarning) {
+        toast({
+          title: selectedAlocacao ? "Alocação atualizada com alerta" : "Alocação criada com alerta",
+          description: saved.capacityWarning.message,
+          variant: "destructive",
+        });
+      } else {
+        toast({ title: selectedAlocacao ? "Alocação atualizada" : "Alocação criada" });
+      }
     } catch (e: unknown) {
       toast({ title: "Erro", description: (e as Error).message, variant: "destructive" });
       throw e;

@@ -3,6 +3,7 @@ const router = express.Router();
 const { sanitizeInt, sanitizeNumber, sanitizeString } = require("../utils/parsing");
 const { hasDuplicateAssignment } = require("../utils/allocationRules");
 const { logAudit } = require("../utils/audit");
+const { buildAllocationCapacityWarning } = require("../utils/capacityRules");
 
 async function syncTaskAssignmentState(pool, supabaseSync, taskId) {
   const [taskRows] = await pool.query("SELECT * FROM tarefas WHERE id = ?", [taskId]);
@@ -97,6 +98,7 @@ module.exports = function (pool, auth) {
         });
       }
 
+      const plannedWork = sanitizeNumber(req.body.work);
       const [result] = await pool.query(
         `INSERT INTO task_assignments (task_id, resource_id, resource_name, units, work, actual_work, remaining_work, cost)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -105,7 +107,7 @@ module.exports = function (pool, auth) {
           resourceId,
           resourceRows[0].nome,
           sanitizeNumber(req.body.units, 1),
-          sanitizeNumber(req.body.work),
+          plannedWork,
           sanitizeNumber(req.body.actualWork),
           sanitizeNumber(req.body.remainingWork),
           sanitizeNumber(req.body.cost),
@@ -114,6 +116,11 @@ module.exports = function (pool, auth) {
 
       await syncTaskAssignmentState(pool, supabaseSync, taskId);
       const [rows] = await pool.query("SELECT * FROM task_assignments WHERE id = ?", [result.insertId]);
+      const capacityWarning = await buildAllocationCapacityWarning(pool, {
+        taskId,
+        resourceId,
+        plannedWork,
+      });
       const [taskRows] = await pool.query("SELECT projeto, projeto_id, tarefa FROM tarefas WHERE id = ?", [taskId]);
       const [projectRows] = taskRows[0]?.projeto_id
         ? [[{ id: taskRows[0].projeto_id }]]
@@ -137,6 +144,7 @@ module.exports = function (pool, auth) {
         actualWork: Number(rows[0].actual_work || 0),
         remainingWork: Number(rows[0].remaining_work || 0),
         cost: Number(rows[0].cost || 0),
+        capacityWarning: capacityWarning || undefined,
       });
     } catch (err) {
       console.error("Error creating alocacao:", err);
@@ -163,6 +171,7 @@ module.exports = function (pool, auth) {
         });
       }
 
+      const plannedWork = sanitizeNumber(req.body.work, existingRows[0].work);
       await pool.query(
         `UPDATE task_assignments
          SET resource_id=?, resource_name=?, units=?, work=?, actual_work=?, remaining_work=?, cost=?
@@ -171,7 +180,7 @@ module.exports = function (pool, auth) {
           resourceId,
           resourceRows[0].nome,
           sanitizeNumber(req.body.units, existingRows[0].units),
-          sanitizeNumber(req.body.work, existingRows[0].work),
+          plannedWork,
           sanitizeNumber(req.body.actualWork, existingRows[0].actual_work),
           sanitizeNumber(req.body.remainingWork, existingRows[0].remaining_work),
           sanitizeNumber(req.body.cost, existingRows[0].cost),
@@ -181,6 +190,12 @@ module.exports = function (pool, auth) {
 
       await syncTaskAssignmentState(pool, supabaseSync, existingRows[0].task_id);
       const [rows] = await pool.query("SELECT * FROM task_assignments WHERE id = ?", [req.params.id]);
+      const capacityWarning = await buildAllocationCapacityWarning(pool, {
+        taskId: existingRows[0].task_id,
+        resourceId,
+        plannedWork,
+        excludeAssignmentId: req.params.id,
+      });
       const [taskRows] = await pool.query("SELECT projeto, projeto_id, tarefa FROM tarefas WHERE id = ?", [existingRows[0].task_id]);
       const [projectRows] = taskRows[0]?.projeto_id
         ? [[{ id: taskRows[0].projeto_id }]]
@@ -205,6 +220,7 @@ module.exports = function (pool, auth) {
         actualWork: Number(rows[0].actual_work || 0),
         remainingWork: Number(rows[0].remaining_work || 0),
         cost: Number(rows[0].cost || 0),
+        capacityWarning: capacityWarning || undefined,
       });
     } catch (err) {
       console.error("Error updating alocacao:", err);

@@ -56,6 +56,15 @@ export interface Alocacao {
   actualWork: number;
   remainingWork: number;
   cost: number;
+  capacityWarning?: {
+    code: string;
+    message: string;
+    resourceId?: number;
+    resourceName?: string;
+    occupancyPct?: number;
+    availableHours?: number;
+    plannedWork?: number;
+  };
 }
 
 export interface Comentario {
