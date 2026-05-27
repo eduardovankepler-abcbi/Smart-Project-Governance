@@ -1,5 +1,6 @@
 import ExcelJS from "exceljs";
 import type { Projeto, Tarefa, Recurso } from "@/data/projectData";
+import { normalizeMaxUnits } from "@/utils/resourceCapacity";
 
 function str(val: unknown, maxLen = 255): string {
   if (val == null) return "";
@@ -323,7 +324,7 @@ function parseEdrawSchedule(workbook: ExcelJS.Workbook, file: File): ImportResul
         nome: str(col(row, "Name", "Nome"), 200),
         funcao: str(col(row, "Group", "Função", "Funcao", "Type"), 200),
         resourceType: str(col(row, "Type"), 50).toLowerCase().includes("people") ? "work" : str(col(row, "Type"), 50),
-        maxUnits: num(col(row, "Max Units", "MaxUnits"), 1),
+        maxUnits: normalizeMaxUnits(num(col(row, "Max Units", "MaxUnits"), 1)),
         standardRate: num(col(row, "Standard Rate", "Cost Per")),
         overtimeRate: num(col(row, "Overtime Rate")),
         email: str(col(row, "E-Mail", "Email"), 200),

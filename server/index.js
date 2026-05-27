@@ -43,6 +43,7 @@ const { withMysqlSsl } = require("./utils/mysqlConnection");
 const { buildExcelImportPreview } = require("./utils/excelImportPreview");
 const { buildMsProjectImportPreview } = require("./utils/msProjectImportPreview");
 const { deriveTaskStatus } = require("./utils/statusRules");
+const { normalizeMaxUnits } = require("./utils/resourceCapacity");
 const {
   ROLES,
   canWriteData,
@@ -863,7 +864,7 @@ app.post("/api/import-excel", requireAuth, requireImportAccess, upload.single("f
             nome,
             sanitizeString(col(r, "Função", "funcao", "Funcao", "Group", "Type"), 200),
             sanitizeString(col(r, "Type", "resourceType"), 50).toLowerCase().includes("people") ? "work" : sanitizeString(col(r, "Type", "resourceType"), 50),
-            sanitizeNumber(col(r, "Max Units", "maxUnits"), 1),
+            normalizeMaxUnits(sanitizeNumber(col(r, "Max Units", "maxUnits"), 1)),
             sanitizeNumber(col(r, "Standard Rate", "standardRate", "Cost Per")),
             sanitizeNumber(col(r, "Overtime Rate", "overtimeRate")),
             sanitizeString(col(r, "E-Mail", "Email", "email"), 200),

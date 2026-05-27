@@ -2,6 +2,7 @@ const express = require("express");
 const router = express.Router();
 const { sanitizeString, sanitizeNumber } = require("../utils/parsing");
 const { logAudit } = require("../utils/audit");
+const { normalizeMaxUnits } = require("../utils/resourceCapacity");
 
 function stringifySpecialties(value) {
   if (!value) return "[]";
@@ -68,7 +69,7 @@ module.exports = function (pool, auth) {
           stringifySpecialties(b.specialties),
           sanitizeString(b.resourceType, 20) || "work",
           sanitizeString(b.initials, 20),
-          sanitizeNumber(b.maxUnits, 1),
+          normalizeMaxUnits(sanitizeNumber(b.maxUnits, 1)),
           sanitizeNumber(b.standardRate),
           sanitizeNumber(b.overtimeRate),
           sanitizeString(b.email, 200),
@@ -107,7 +108,7 @@ module.exports = function (pool, auth) {
           stringifySpecialties(b.specialties),
           sanitizeString(b.resourceType, 20) || "work",
           sanitizeString(b.initials, 20),
-          sanitizeNumber(b.maxUnits, 1),
+          normalizeMaxUnits(sanitizeNumber(b.maxUnits, 1)),
           sanitizeNumber(b.standardRate),
           sanitizeNumber(b.overtimeRate),
           sanitizeString(b.email, 200),

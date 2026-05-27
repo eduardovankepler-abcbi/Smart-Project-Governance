@@ -9,6 +9,7 @@ import { Progress } from "@/components/ui/progress";
 import { AlertTriangle, CalendarRange, CheckCircle2, Gauge, Users } from "lucide-react";
 import { ResponsiveContainer, BarChart, Bar, CartesianGrid, XAxis, YAxis, Tooltip } from "recharts";
 import { getTaskResourceNames } from "@/utils/projectModel";
+import { normalizeMaxUnits } from "@/utils/resourceCapacity";
 import ChartPreviewModal from "@/components/ChartPreviewModal";
 
 interface CapacityAssignment {
@@ -269,7 +270,7 @@ export default function CapacidadePage() {
             .filter(Boolean),
         )).sort();
 
-        const capacityUnits = Number(resource.maxUnits || 1);
+        const capacityUnits = normalizeMaxUnits(resource.maxUnits);
         const plannedWork = assignments.reduce((sum, assignment) => sum + Number(assignment.work || 0), 0);
         const actualWork = assignments.reduce((sum, assignment) => sum + Number(assignment.actualWork || 0), 0);
         const remainingWork = assignments.reduce((sum, assignment) => sum + Number(assignment.remainingWork || 0), 0);

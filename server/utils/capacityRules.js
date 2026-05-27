@@ -1,4 +1,5 @@
 const { normalizeDateInput } = require("./parsing");
+const { normalizeMaxUnits } = require("./resourceCapacity");
 
 const HOURS_PER_WORKDAY = 8;
 
@@ -65,7 +66,7 @@ async function buildAllocationCapacityWarning(pool, { taskId, resourceId, planne
   }, 0);
 
   const projectedWork = overlappingWork + Number(plannedWork || 0);
-  const { availableHours, occupancyPct } = calculateOccupancyPercent(projectedWork, resource.max_units, targetWindow.start, targetWindow.end);
+  const { availableHours, occupancyPct } = calculateOccupancyPercent(projectedWork, normalizeMaxUnits(resource.max_units), targetWindow.start, targetWindow.end);
   if (occupancyPct <= 100) return null;
 
   return {

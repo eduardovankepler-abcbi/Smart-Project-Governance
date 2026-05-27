@@ -16,6 +16,7 @@ import DeleteDialog from "@/components/DeleteDialog";
 import ChartPreviewModal from "@/components/ChartPreviewModal";
 import type { Recurso } from "@/data/projectData";
 import { getTaskResourceNames } from "@/utils/projectModel";
+import { formatCapacityPercent, normalizeMaxUnits } from "@/utils/resourceCapacity";
 
 interface RecursoInfo {
   externalId?: string;
@@ -77,7 +78,7 @@ export default function RecursosPage() {
           specialties: r.specialties || [],
           resourceType: r.resourceType || "work",
           initials: r.initials || "",
-          maxUnits: r.maxUnits || 1,
+          maxUnits: normalizeMaxUnits(r.maxUnits),
           standardRate: r.standardRate || 0,
           overtimeRate: r.overtimeRate || 0,
           email: r.email || "",
@@ -260,7 +261,7 @@ export default function RecursosPage() {
                       </div>
                       <div>
                         <p className="text-xs text-muted-foreground">Capacidade</p>
-                        <p className="text-lg font-display font-bold text-foreground">{Math.round(r.maxUnits * 100)}%</p>
+                        <p className="text-lg font-display font-bold text-foreground">{formatCapacityPercent(r.maxUnits)}</p>
                       </div>
                     </div>
                     {canWrite && (

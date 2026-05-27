@@ -5,6 +5,7 @@ const {
   calculateOccupancyPercent,
   countWorkingDays,
 } = require("../utils/capacityRules");
+const { normalizeMaxUnits } = require("../utils/resourceCapacity");
 
 function createConn(handler) {
   return {
@@ -22,6 +23,13 @@ test("calculateOccupancyPercent compares planned work with available hours", () 
   const result = calculateOccupancyPercent(48, 1, new Date("2026-05-25T00:00:00"), new Date("2026-05-29T00:00:00"));
   assert.equal(result.availableHours, 40);
   assert.equal(result.occupancyPct, 120);
+});
+
+test("normalizeMaxUnits accepts decimal capacity and legacy percent values", () => {
+  assert.equal(normalizeMaxUnits(1), 1);
+  assert.equal(normalizeMaxUnits(0.5), 0.5);
+  assert.equal(normalizeMaxUnits(100), 1);
+  assert.equal(normalizeMaxUnits(250), 2.5);
 });
 
 test("buildAllocationCapacityWarning warns when projected work exceeds task-window capacity", async () => {

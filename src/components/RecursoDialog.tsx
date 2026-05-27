@@ -9,6 +9,7 @@ import { useToast } from "@/hooks/use-toast";
 import * as api from "@/services/api";
 import { isApiEnabled } from "@/config/api";
 import { useData } from "@/contexts/DataContext";
+import { normalizeMaxUnits } from "@/utils/resourceCapacity";
 
 interface RecursoDialogProps {
   open: boolean;
@@ -40,7 +41,7 @@ export default function RecursoDialog({ open, onOpenChange, recurso }: RecursoDi
   useEffect(() => {
     if (!open) return;
     if (recurso) {
-      setForm({ ...emptyRecurso, ...recurso });
+      setForm({ ...emptyRecurso, ...recurso, maxUnits: normalizeMaxUnits(recurso.maxUnits) });
       setSpecialtiesInput((recurso.specialties || []).join("; "));
       return;
     }
@@ -50,7 +51,7 @@ export default function RecursoDialog({ open, onOpenChange, recurso }: RecursoDi
 
   const handleOpenChange = (o: boolean) => {
     if (o && recurso) {
-      setForm({ ...emptyRecurso, ...recurso });
+      setForm({ ...emptyRecurso, ...recurso, maxUnits: normalizeMaxUnits(recurso.maxUnits) });
       setSpecialtiesInput((recurso.specialties || []).join("; "));
     } else if (o) {
       setForm({ ...emptyRecurso });
@@ -70,6 +71,7 @@ export default function RecursoDialog({ open, onOpenChange, recurso }: RecursoDi
     try {
       const payload = {
         ...form,
+        maxUnits: normalizeMaxUnits(form.maxUnits),
         specialties: specialtiesInput.split(";").map((item) => item.trim()).filter(Boolean),
       };
       if (isApiEnabled()) {

@@ -1,5 +1,6 @@
 const { XMLParser } = require("fast-xml-parser");
 const { deriveTaskStatus, deriveProjectStatus, TASK_STATUSES } = require("./statusRules");
+const { normalizeMaxUnits } = require("./resourceCapacity");
 
 function asArray(value) {
   if (value == null) return [];
@@ -156,7 +157,7 @@ function parseMsProjectXml(xmlContent) {
       funcao: String(resource.Group || resource.Type || ""),
       resourceType: normalizeResourceType(resource.Type),
       initials: String(resource.Initials || ""),
-      maxUnits: Number(resource.MaxUnits || 1),
+      maxUnits: normalizeMaxUnits(resource.MaxUnits || 1),
       standardRate: parseRate(resource.StandardRate),
       overtimeRate: parseRate(resource.OvertimeRate),
       email: String(resource.EmailAddress || ""),

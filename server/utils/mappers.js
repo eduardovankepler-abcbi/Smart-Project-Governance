@@ -3,6 +3,7 @@
 // ============================================
 
 const { normalizeDateInput } = require("./parsing");
+const { normalizeMaxUnits } = require("./resourceCapacity");
 
 function pickDateValue(legacyValue, typedValue) {
   return legacyValue || normalizeDateInput(typedValue) || "";
@@ -130,7 +131,7 @@ function mapRecurso(row) {
     })(),
     resourceType: row.resource_type || "work",
     initials: row.initials || "",
-    maxUnits: parseFloat(row.max_units || 1),
+    maxUnits: normalizeMaxUnits(row.max_units),
     standardRate: parseFloat(row.standard_rate || 0),
     overtimeRate: parseFloat(row.overtime_rate || 0),
     email: row.email || "",
