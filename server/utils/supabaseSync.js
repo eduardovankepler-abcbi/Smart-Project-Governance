@@ -172,6 +172,11 @@ function toComentarioRow(row) {
     author_user_id: row.author_user_id || null,
     author_nome: row.author_nome || "",
     content: row.content || "",
+    comment_type: row.comment_type || "comment",
+    owner_name: row.owner_name || "",
+    due_date: row.due_date || null,
+    resolution_status: row.resolution_status || "open",
+    resolved_at: row.resolved_at || null,
     created_at: row.created_at,
     updated_at: row.updated_at,
   };

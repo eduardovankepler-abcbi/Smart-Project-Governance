@@ -268,11 +268,17 @@ CREATE TABLE comentarios (
   author_user_id INT NULL,
   author_nome VARCHAR(120) DEFAULT '',
   content TEXT NOT NULL,
+  comment_type VARCHAR(30) DEFAULT 'comment',
+  owner_name VARCHAR(120) DEFAULT '',
+  due_date DATE NULL,
+  resolution_status VARCHAR(20) DEFAULT 'open',
+  resolved_at DATETIME NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   INDEX idx_comentarios_project (project_id),
   INDEX idx_comentarios_task (task_id),
-  INDEX idx_comentarios_author (author_user_id)
+  INDEX idx_comentarios_author (author_user_id),
+  INDEX idx_comentarios_status (resolution_status, due_date)
 ) ENGINE=InnoDB;
 
 DROP TABLE IF EXISTS audit_logs;

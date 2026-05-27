@@ -1,0 +1,41 @@
+SET @sql = IF(
+  EXISTS(SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'comentarios' AND COLUMN_NAME = 'comment_type'),
+  'SELECT 1',
+  'ALTER TABLE comentarios ADD COLUMN comment_type VARCHAR(30) DEFAULT ''comment'' AFTER content'
+);
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @sql = IF(
+  EXISTS(SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'comentarios' AND COLUMN_NAME = 'owner_name'),
+  'SELECT 1',
+  'ALTER TABLE comentarios ADD COLUMN owner_name VARCHAR(120) DEFAULT '''' AFTER comment_type'
+);
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @sql = IF(
+  EXISTS(SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'comentarios' AND COLUMN_NAME = 'due_date'),
+  'SELECT 1',
+  'ALTER TABLE comentarios ADD COLUMN due_date DATE NULL AFTER owner_name'
+);
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @sql = IF(
+  EXISTS(SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'comentarios' AND COLUMN_NAME = 'resolution_status'),
+  'SELECT 1',
+  'ALTER TABLE comentarios ADD COLUMN resolution_status VARCHAR(20) DEFAULT ''open'' AFTER due_date'
+);
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @sql = IF(
+  EXISTS(SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'comentarios' AND COLUMN_NAME = 'resolved_at'),
+  'SELECT 1',
+  'ALTER TABLE comentarios ADD COLUMN resolved_at DATETIME NULL AFTER resolution_status'
+);
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @sql = IF(
+  EXISTS(SELECT 1 FROM INFORMATION_SCHEMA.STATISTICS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'comentarios' AND INDEX_NAME = 'idx_comentarios_status'),
+  'SELECT 1',
+  'ALTER TABLE comentarios ADD INDEX idx_comentarios_status (resolution_status, due_date)'
+);
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;

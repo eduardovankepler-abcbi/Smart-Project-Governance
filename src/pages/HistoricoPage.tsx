@@ -13,7 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { MessageSquare, History, Pencil, Trash2 } from "lucide-react";
+import { MessageSquare, History, Pencil, Trash2, CheckCircle2, AlertTriangle } from "lucide-react";
 import { buildTaskDisplayLabel } from "@/utils/taskIdentity";
 
 function formatDateTime(value?: string) {
@@ -39,6 +39,10 @@ export default function HistoricoPage() {
   const [projectId, setProjectId] = useState<string>("all");
   const [taskId, setTaskId] = useState<string>("all");
   const [content, setContent] = useState("");
+  const [commentType, setCommentType] = useState<NonNullable<Comentario["commentType"]>>("comment");
+  const [ownerName, setOwnerName] = useState("");
+  const [dueDate, setDueDate] = useState("");
+  const [resolutionStatus, setResolutionStatus] = useState<NonNullable<Comentario["resolutionStatus"]>>("open");
   const [editingComment, setEditingComment] = useState<Comentario | null>(null);
   const [auditSearch, setAuditSearch] = useState("");
   const [auditEntityType, setAuditEntityType] = useState("all");
@@ -98,6 +102,18 @@ export default function HistoricoPage() {
   const resetForm = () => {
     setEditingComment(null);
     setContent("");
+    setCommentType("comment");
+    setOwnerName("");
+    setDueDate("");
+    setResolutionStatus("open");
+  };
+
+  const commentTypeLabel: Record<NonNullable<Comentario["commentType"]>, string> = {
+    comment: "Comentário",
+    decision: "Decisão",
+    action: "Pendência",
+    risk: "Risco",
+    issue: "Impedimento",
   };
 
   const handleSaveComment = async () => {
@@ -116,13 +132,23 @@ export default function HistoricoPage() {
       }
 
       if (editingComment?.id) {
-        await api.updateComentario(editingComment.id, { content });
+        await api.updateComentario(editingComment.id, {
+          content,
+          commentType,
+          ownerName,
+          dueDate,
+          resolutionStatus,
+        });
       } else {
         await api.createComentario({
           entityType,
           projectId: projectId !== "all" ? Number(projectId) : undefined,
           taskId: entityType === "tarefa" && taskId !== "all" ? taskId : undefined,
           content,
+          commentType,
+          ownerName,
+          dueDate,
+          resolutionStatus,
         });
       }
       await Promise.all([loadComments(), canSeeAudit ? loadAudit() : Promise.resolve()]);
@@ -212,6 +238,27 @@ export default function HistoricoPage() {
                       placeholder="Registre contexto, decisões, pendências ou alinhamentos importantes."
                       className="min-h-28"
                     />
+                    <div className="grid gap-3 md:grid-cols-4">
+                      <Select value={commentType} onValueChange={(value) => setCommentType(value as NonNullable<Comentario["commentType"]>)}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="comment">Comentário</SelectItem>
+                          <SelectItem value="decision">Decisão</SelectItem>
+                          <SelectItem value="action">Pendência</SelectItem>
+                          <SelectItem value="risk">Risco</SelectItem>
+                          <SelectItem value="issue">Impedimento</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <Input value={ownerName} onChange={(e) => setOwnerName(e.target.value)} placeholder="Responsável" />
+                      <Input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
+                      <Select value={resolutionStatus} onValueChange={(value) => setResolutionStatus(value as NonNullable<Comentario["resolutionStatus"]>)}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="open">Aberto</SelectItem>
+                          <SelectItem value="resolved">Resolvido</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
                     <div className="flex justify-end">
                       <Button onClick={handleSaveComment}>{editingComment ? "Salvar alteração" : "Publicar comentário"}</Button>
                     </div>
@@ -229,10 +276,23 @@ export default function HistoricoPage() {
                         <div className="flex flex-wrap items-center gap-2">
                           <MessageSquare size={16} className="text-primary" />
                           <Badge variant="outline">{item.entityType === "projeto" ? "Projeto" : "Tarefa"}</Badge>
+                          <Badge variant={item.commentType === "issue" || item.commentType === "risk" ? "destructive" : "secondary"}>
+                            {commentTypeLabel[item.commentType || "comment"]}
+                          </Badge>
+                          <Badge variant={item.resolutionStatus === "resolved" ? "secondary" : "outline"}>
+                            {item.resolutionStatus === "resolved" ? <CheckCircle2 size={12} className="mr-1" /> : <AlertTriangle size={12} className="mr-1" />}
+                            {item.resolutionStatus === "resolved" ? "Resolvido" : "Aberto"}
+                          </Badge>
                           {item.projectName ? <Badge variant="outline">{item.projectName}</Badge> : null}
                           {item.taskName ? <Badge variant="outline">{item.taskName}</Badge> : null}
                         </div>
                         <p className="text-sm leading-6 text-foreground whitespace-pre-wrap">{item.content}</p>
+                        {(item.ownerName || item.dueDate) ? (
+                          <div className="flex flex-wrap gap-3 text-xs text-muted-foreground">
+                            {item.ownerName ? <span>Responsável: <strong className="text-foreground">{item.ownerName}</strong></span> : null}
+                            {item.dueDate ? <span>Prazo: <strong className="text-foreground">{item.dueDate}</strong></span> : null}
+                          </div>
+                        ) : null}
                         <div className="flex flex-wrap items-center justify-between gap-3 text-xs text-muted-foreground">
                           <span>{item.authorName || "Sistema"} · {formatDateTime(item.createdAt)}</span>
                           {canWrite ? (
@@ -246,6 +306,10 @@ export default function HistoricoPage() {
                                   setProjectId(item.projectId ? String(item.projectId) : "all");
                                   setTaskId(item.taskId || "all");
                                   setContent(item.content);
+                                  setCommentType(item.commentType || "comment");
+                                  setOwnerName(item.ownerName || "");
+                                  setDueDate(item.dueDate || "");
+                                  setResolutionStatus(item.resolutionStatus || "open");
                                 }}
                               >
                                 <Pencil size={14} className="mr-1" /> Editar
