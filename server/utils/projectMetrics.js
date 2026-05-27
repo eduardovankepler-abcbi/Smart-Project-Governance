@@ -1,4 +1,5 @@
 const { normalizeDateInput } = require("./parsing");
+const { TASK_STATUSES, deriveTaskStatus, deriveProjectStatus } = require("./statusRules");
 
 function parseDateValue(value) {
   const normalized = normalizeDateInput(value);
@@ -11,14 +12,6 @@ function formatMmDdYy(date) {
   if (!(date instanceof Date)) return "";
   const year = String(date.getFullYear()).slice(-2);
   return `${date.getMonth() + 1}/${date.getDate()}/${year}`;
-}
-
-function deriveProjectStatus(tasks) {
-  if (!tasks.length) return "Não iniciado";
-  if (tasks.every((task) => task.status === "Concluído")) return "Concluído";
-  if (tasks.some((task) => task.status === "Atrasado")) return "Atrasado";
-  if (tasks.some((task) => task.status === "Em andamento")) return "Em andamento";
-  return "Não iniciado";
 }
 
 function buildProjectCode(projeto) {
@@ -39,17 +32,28 @@ async function syncProjectMetrics(pool, projeto) {
     [projectId || 0, projeto]
   );
 
-  const totalTarefas = taskRows.length;
-  const tarefasConcluidas = taskRows.filter((task) => task.status === "Concluído").length;
-  const tarefasAndamento = taskRows.filter((task) => task.status === "Em andamento").length;
-  const tarefasAtrasadas = taskRows.filter((task) => task.status === "Atrasado").length;
-  const tarefasNaoIniciadas = taskRows.filter((task) => task.status === "Não iniciado").length;
+  const tasksWithDerivedStatus = taskRows.map((task) => ({
+    ...task,
+    status: deriveTaskStatus({
+      status: task.status,
+      percentual: task.percentual,
+      dataInicioPlanej: task.data_inicio_planej_date || task.data_inicio_planej,
+      dataFimPlanej: task.data_fim_planej_date || task.data_fim_planej,
+      dataInicioReal: task.data_inicio_real_date || task.data_inicio_real,
+      dataFimReal: task.data_fim_real_date || task.data_fim_real,
+    }),
+  }));
+  const totalTarefas = tasksWithDerivedStatus.length;
+  const tarefasConcluidas = tasksWithDerivedStatus.filter((task) => task.status === TASK_STATUSES.DONE).length;
+  const tarefasAndamento = tasksWithDerivedStatus.filter((task) => task.status === TASK_STATUSES.IN_PROGRESS).length;
+  const tarefasAtrasadas = tasksWithDerivedStatus.filter((task) => task.status === TASK_STATUSES.LATE).length;
+  const tarefasNaoIniciadas = tasksWithDerivedStatus.filter((task) => task.status === TASK_STATUSES.NOT_STARTED).length;
   const conclusao = totalTarefas
     ? Math.round(taskRows.reduce((sum, task) => sum + Number(task.percentual || 0), 0) / totalTarefas)
     : 0;
   const valorPrevisto = taskRows.reduce((sum, task) => sum + Number(task.valor_previsto || 0), 0);
   const valorGasto = taskRows.reduce((sum, task) => sum + Number(task.valor_gasto || 0), 0);
-  const projectStatus = deriveProjectStatus(taskRows);
+  const projectStatus = deriveProjectStatus(tasksWithDerivedStatus);
 
   const starts = taskRows
     .map((task) => parseDateValue(task.data_inicio_planej_date || task.data_inicio_planej))

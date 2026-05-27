@@ -33,7 +33,6 @@ const {
   parentFromWbs,
   outlineLevelFromWbs,
   parseDurationHours,
-  mapScheduleStatus,
 } = require("./utils/parsing");
 const { syncFullSnapshot, checkSupabaseHealth, isSupabaseSyncEnabled } = require("./utils/supabaseSync");
 const { syncProjectMetrics } = require("./utils/projectMetrics");
@@ -43,6 +42,7 @@ const { BASELINE_SOURCE_TYPES, createProjectBaseline } = require("./utils/baseli
 const { withMysqlSsl } = require("./utils/mysqlConnection");
 const { buildExcelImportPreview } = require("./utils/excelImportPreview");
 const { buildMsProjectImportPreview } = require("./utils/msProjectImportPreview");
+const { deriveTaskStatus } = require("./utils/statusRules");
 const {
   ROLES,
   canWriteData,
@@ -206,14 +206,27 @@ function buildImportedTaskId(projectId, sequence) {
 
 async function upsertScheduleProject(conn, { projectName, fileName, rootRow, edrawScheduleRows, recursos }) {
   const percentual = sanitizeNumber(col(rootRow, "Progress", "% Concluído", "% Concluido"));
-  const status = mapScheduleStatus(col(rootRow, "Status"), percentual);
   const dataInicioPlanej = parseExcelDate(col(rootRow, "Start", "Data Início Planejado"));
   const dataFimPlanej = parseExcelDate(col(rootRow, "Finish", "Data Fim Planejado"));
+  const status = deriveTaskStatus({
+    status: col(rootRow, "Status"),
+    percentual,
+    dataInicioPlanej,
+    dataFimPlanej,
+  });
+  const scheduleStatuses = edrawScheduleRows.map((row) => deriveTaskStatus({
+    status: col(row, "Status"),
+    percentual: sanitizeNumber(col(row, "Progress")),
+    dataInicioPlanej: parseExcelDate(col(row, "Start", "Data Início Planejado")),
+    dataFimPlanej: parseExcelDate(col(row, "Finish", "Data Fim Planejado")),
+    dataInicioReal: parseExcelDate(col(row, "ActualStart", "Actual Start", "Data Início Real")),
+    dataFimReal: parseExcelDate(col(row, "ActualFinish", "Actual Finish", "Data Fim Real")),
+  }));
   const stats = {
-    concluidas: edrawScheduleRows.filter((row) => mapScheduleStatus(col(row, "Status"), sanitizeNumber(col(row, "Progress"))) === "Concluído").length,
-    andamento: edrawScheduleRows.filter((row) => mapScheduleStatus(col(row, "Status"), sanitizeNumber(col(row, "Progress"))) === "Em andamento").length,
-    atrasadas: edrawScheduleRows.filter((row) => mapScheduleStatus(col(row, "Status"), sanitizeNumber(col(row, "Progress"))) === "Atrasado").length,
-    naoIniciadas: edrawScheduleRows.filter((row) => mapScheduleStatus(col(row, "Status"), sanitizeNumber(col(row, "Progress"))) === "Não iniciado").length,
+    concluidas: scheduleStatuses.filter((item) => item === "Concluído").length,
+    andamento: scheduleStatuses.filter((item) => item === "Em andamento").length,
+    atrasadas: scheduleStatuses.filter((item) => item === "Atrasado").length,
+    naoIniciadas: scheduleStatuses.filter((item) => item === "Não iniciado").length,
   };
 
   const [existingProjects] = await conn.query("SELECT id FROM projetos WHERE projeto = ? LIMIT 1", [projectName]);
@@ -756,15 +769,20 @@ app.post("/api/import-excel", requireAuth, requireImportAccess, upload.single("f
           const percentual = isEdrawSchedule
             ? sanitizeNumber(col(r, "Progress", "% Concluído", "% Concluido", "percentual"))
             : sanitizeNumber(col(r, "% Concluído", "percentual", "% Concluido"));
-          const status = isEdrawSchedule
-            ? mapScheduleStatus(col(r, "Status"), percentual)
-            : sanitizeString(col(r, "Status", "status"), 50);
           const taskProjectName = isEdrawSchedule ? scheduleProjectName : sanitizeString(col(r, "Projeto", "projeto"), 200);
           const taskProjectId = isEdrawSchedule ? scheduleProjectId : projectIdByName.get(taskProjectName) || null;
           const dataInicioPlanej = parseExcelDate(col(r, "Data Início Planejado", "data_inicio_planej", "Start"));
           const dataFimPlanej = parseExcelDate(col(r, "Data Fim Planejado", "data_fim_planej", "Finish"));
           const dataInicioReal = parseExcelDate(col(r, "Data Início Real", "data_inicio_real", "ActualStart", "Actual Start"));
           const dataFimReal = parseExcelDate(col(r, "Data Fim Real", "data_fim_real", "ActualFinish", "Actual Finish"));
+          const status = deriveTaskStatus({
+            status: isEdrawSchedule ? col(r, "Status") : col(r, "Status", "status"),
+            percentual,
+            dataInicioPlanej,
+            dataFimPlanej,
+            dataInicioReal,
+            dataFimReal,
+          });
           const constraintDate = parseExcelDate(col(r, "Data da Restrição", "Data Restrição", "constraint_date"));
           await conn.query(
             `INSERT INTO tarefas (id, parent_id, external_id, wbs, outline_level, sort_order, projeto, projeto_id, tarefa, subtarefa, responsavel, funcao, data_inicio_planej, data_inicio_planej_date, esforco_planej, data_fim_planej, data_fim_planej_date, data_inicio_real, data_inicio_real_date, esforco_real, data_fim_real, data_fim_real_date, percentual, status, duration_minutes, constraint_date, constraint_date_date, valor_previsto, valor_gasto, dias_planejados, dias_real, dias_completados)

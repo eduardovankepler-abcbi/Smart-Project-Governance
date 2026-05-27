@@ -1,4 +1,5 @@
 const { XMLParser } = require("fast-xml-parser");
+const { deriveTaskStatus, deriveProjectStatus, TASK_STATUSES } = require("./statusRules");
 
 function asArray(value) {
   if (value == null) return [];
@@ -95,6 +96,11 @@ function parseMsProjectXml(xmlContent) {
       const wbs = String(task.OutlineNumber || task.WBS || uid);
       const id = String(task.ID || task.TaskID || wbs || uid);
       taskUidToId.set(uid, id);
+      const percentual = Number(task.PercentComplete || 0);
+      const dataInicioPlanej = toMmDdYy(task.Start);
+      const dataFimPlanej = toMmDdYy(task.Finish);
+      const dataInicioReal = toMmDdYy(task.ActualStart);
+      const dataFimReal = toMmDdYy(task.ActualFinish);
       return {
         id,
         externalId: uid,
@@ -107,14 +113,21 @@ function parseMsProjectXml(xmlContent) {
         subtarefa: "",
         responsavel: "",
         funcao: "",
-        dataInicioPlanej: toMmDdYy(task.Start),
+        dataInicioPlanej,
         esforcoPlanej: parseDurationMinutes(task.Work) / 60,
-        dataFimPlanej: toMmDdYy(task.Finish),
-        dataInicioReal: toMmDdYy(task.ActualStart),
+        dataFimPlanej,
+        dataInicioReal,
         esforcoReal: parseDurationMinutes(task.ActualWork) / 60,
-        dataFimReal: toMmDdYy(task.ActualFinish),
-        percentual: Number(task.PercentComplete || 0),
-        status: Number(task.PercentComplete || 0) >= 100 ? "Concluído" : (task.Active === false ? "Não iniciado" : "Em andamento"),
+        dataFimReal,
+        percentual,
+        status: deriveTaskStatus({
+          status: task.Active === false ? TASK_STATUSES.NOT_STARTED : "",
+          percentual,
+          dataInicioPlanej,
+          dataFimPlanej,
+          dataInicioReal,
+          dataFimReal,
+        }),
         taskType: normalizeTaskType(task.Type),
         milestone: String(task.Milestone) === "1" || String(task.Milestone).toLowerCase() === "true",
         durationMinutes: parseDurationMinutes(task.Duration),
@@ -201,11 +214,11 @@ function parseMsProjectXml(xmlContent) {
       dataInicio: "",
       dataFimReal: "",
       totalTarefas: normalizedTasks.length,
-      tarefasConcluidas: normalizedTasks.filter((task) => task.status === "Concluído").length,
-      tarefasAndamento: normalizedTasks.filter((task) => task.status === "Em andamento").length,
-      tarefasAtrasadas: normalizedTasks.filter((task) => task.status === "Atrasado").length,
-      tarefasNaoIniciadas: normalizedTasks.filter((task) => task.status === "Não iniciado").length,
-      status: "Em andamento",
+      tarefasConcluidas: normalizedTasks.filter((task) => task.status === TASK_STATUSES.DONE).length,
+      tarefasAndamento: normalizedTasks.filter((task) => task.status === TASK_STATUSES.IN_PROGRESS).length,
+      tarefasAtrasadas: normalizedTasks.filter((task) => task.status === TASK_STATUSES.LATE).length,
+      tarefasNaoIniciadas: normalizedTasks.filter((task) => task.status === TASK_STATUSES.NOT_STARTED).length,
+      status: deriveProjectStatus(normalizedTasks),
       conclusao: normalizedTasks.length
         ? Math.round(normalizedTasks.reduce((sum, task) => sum + Number(task.percentual || 0), 0) / normalizedTasks.length)
         : 0,

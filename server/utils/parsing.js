@@ -80,11 +80,6 @@ function parseDurationHours(value) {
 }
 
 function mapScheduleStatus(value, progress = 0) {
-  const raw = normalizeColName(sanitizeString(value, 50));
-  if (raw.includes("complete") || raw.includes("concluido")) return "Concluído";
-  if (raw.includes("delay") || raw.includes("atras")) return "Atrasado";
-  if (raw.includes("not started") || raw.includes("nao iniciado")) return "Não iniciado";
-  if (raw.includes("progress") || raw.includes("andamento")) return "Em andamento";
   if (progress >= 100) return "Concluído";
   if (progress > 0) return "Em andamento";
   return "Não iniciado";

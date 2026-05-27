@@ -2,6 +2,7 @@ const express = require("express");
 const router = express.Router();
 const { sanitizeString, sanitizeNumber, sanitizeInt, normalizeDateInput } = require("../utils/parsing");
 const { logAudit } = require("../utils/audit");
+const { deriveTaskStatus } = require("../utils/statusRules");
 
 function asArray(value) {
   if (!value) return [];
@@ -264,6 +265,15 @@ module.exports = function (pool, auth, taskHooks = {}) {
       const dataInicioReal = sanitizeString(b.dataInicioReal, 20);
       const dataFimReal = sanitizeString(b.dataFimReal, 20);
       const constraintDate = sanitizeString(b.constraintDate, 20);
+      const percentual = sanitizeNumber(b.percentual);
+      const status = deriveTaskStatus({
+        status: b.status,
+        percentual,
+        dataInicioPlanej,
+        dataFimPlanej,
+        dataInicioReal,
+        dataFimReal,
+      });
 
       await conn.beginTransaction();
       await conn.query(
@@ -295,8 +305,8 @@ module.exports = function (pool, auth, taskHooks = {}) {
           sanitizeNumber(b.esforcoReal),
           dataFimReal,
           normalizeDateInput(dataFimReal) || null,
-          sanitizeNumber(b.percentual),
-          sanitizeString(b.status, 50),
+          percentual,
+          status,
           sanitizeString(b.taskType, 30) || "fixed_units",
           b.milestone ? 1 : 0,
           sanitizeInt(b.durationMinutes),
@@ -401,6 +411,15 @@ module.exports = function (pool, auth, taskHooks = {}) {
       const dataInicioReal = sanitizeString(b.dataInicioReal, 20);
       const dataFimReal = sanitizeString(b.dataFimReal, 20);
       const constraintDate = sanitizeString(b.constraintDate, 20);
+      const percentual = sanitizeNumber(b.percentual);
+      const status = deriveTaskStatus({
+        status: b.status,
+        percentual,
+        dataInicioPlanej,
+        dataFimPlanej,
+        dataInicioReal,
+        dataFimReal,
+      });
       const nextWbs = sanitizeString(b.wbs, 50) || beforeTaskRows[0].wbs || beforeTaskRows[0].id;
       if (depthFromCode(nextWbs) > MAX_WBS_DEPTH) {
         return res.status(400).json({ error: `Máximo de ${MAX_WBS_DEPTH} níveis de subtarefa permitidos` });
@@ -436,8 +455,8 @@ module.exports = function (pool, auth, taskHooks = {}) {
           sanitizeNumber(b.esforcoReal),
           dataFimReal,
           normalizeDateInput(dataFimReal) || null,
-          sanitizeNumber(b.percentual),
-          sanitizeString(b.status, 50),
+          percentual,
+          status,
           sanitizeString(b.taskType, 30) || "fixed_units",
           b.milestone ? 1 : 0,
           sanitizeInt(b.durationMinutes),
