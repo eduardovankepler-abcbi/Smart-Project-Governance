@@ -14,6 +14,7 @@ import ChartPreviewModal from "@/components/ChartPreviewModal";
 import { useAuth } from "@/contexts/AuthContext";
 import * as api from "@/services/api";
 import type { Comentario } from "@/data/projectData";
+import { summarizeProjectFinancials } from "@/utils/financialMetrics";
 
 const COLORS = [
   "hsl(0, 78%, 45%)",
@@ -174,12 +175,8 @@ export default function DashboardPage() {
   const totalProjetos = filteredProjetos.length;
   const totalTarefas = filteredProjetos.reduce((s, p) => s + p.totalTarefas, 0);
   const totalAtrasadas = filteredProjetos.reduce((s, p) => s + p.tarefasAtrasadas, 0);
-  const valorPrevisto = filteredProjetos.reduce((s, p) => s + p.valorPrevisto, 0);
-  const orcamentoAprovado = filteredProjetos.reduce((s, p) => s + Number(p.orcamentoAprovado || 0), 0);
-  const valorGasto = filteredProjetos.reduce((s, p) => s + p.valorGasto, 0);
-  const execucao = valorPrevisto > 0 ? Math.round((valorGasto / valorPrevisto) * 100) : 0;
-  const consumoOrcamento = orcamentoAprovado > 0 ? Math.round((valorGasto / orcamentoAprovado) * 100) : 0;
-  const saldoOrcamento = orcamentoAprovado - valorGasto;
+  const financialSummary = summarizeProjectFinancials(filteredProjetos);
+  const execucao = financialSummary.plannedCost > 0 ? Math.round((financialSummary.spent / financialSummary.plannedCost) * 100) : 0;
 
   const kpis = [
     {
@@ -216,19 +213,27 @@ export default function DashboardPage() {
     },
     {
       label: "Custo Planejado",
-      value: formatCurrency(valorPrevisto),
+      value: formatCurrency(financialSummary.plannedCost),
       icon: DollarSign,
       color: "text-info",
-      detailA: formatCurrency(valorGasto),
+      detailA: formatCurrency(financialSummary.spent),
       detailB: "valor gasto",
     },
     {
       label: "Orçamento",
-      value: formatCurrency(orcamentoAprovado),
+      value: formatCurrency(financialSummary.approvedBudget),
       icon: CheckCircle,
-      color: saldoOrcamento < 0 ? "text-destructive" : "text-chart-3",
-      detailA: `${consumoOrcamento}% consumido`,
-      detailB: `saldo ${formatCurrency(saldoOrcamento)}`,
+      color: financialSummary.projectedBalance < 0 || financialSummary.actualBalance < 0 ? "text-destructive" : "text-chart-3",
+      detailA: `${financialSummary.consumptionPct}% consumido`,
+      detailB: `saldo ${formatCurrency(financialSummary.actualBalance)}`,
+    },
+    {
+      label: "Projeção Financeira",
+      value: formatCurrency(financialSummary.eac),
+      icon: TrendingUp,
+      color: financialSummary.projectedBalance < 0 ? "text-destructive" : "text-warning",
+      detailA: `ETC ${formatCurrency(financialSummary.etc)}`,
+      detailB: `saldo projetado ${formatCurrency(financialSummary.projectedBalance)}`,
     },
   ];
 

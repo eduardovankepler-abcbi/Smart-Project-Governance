@@ -20,6 +20,7 @@ import DeleteDialog from "@/components/DeleteDialog";
 import type { Projeto, Tarefa } from "@/data/projectData";
 import { getTaskBusinessId, getTaskDisplayHierarchy } from "@/utils/taskIdentity";
 import { getTaskResourceNames } from "@/utils/projectModel";
+import { calculateProjectFinancialMetrics, type FinancialStatus } from "@/utils/financialMetrics";
 
 function StatusBadge({ status }: { status: string }) {
   const color = getStatusColor(status);
@@ -38,6 +39,20 @@ function StatusBadge({ status }: { status: string }) {
 
 const STATUS_OPTIONS = ["Atrasado", "Em andamento", "Não iniciado", "Concluído"];
 type SortKey = "projeto" | "status" | "dataFimPlanej" | "conclusao";
+
+const FINANCIAL_STATUS_LABELS: Record<FinancialStatus, string> = {
+  no_budget: "Sem orçamento",
+  healthy: "Saudável",
+  attention: "Atenção",
+  overrun: "Estouro projetado",
+};
+
+const FINANCIAL_STATUS_CLASSES: Record<FinancialStatus, string> = {
+  no_budget: "bg-secondary text-secondary-foreground border-border",
+  healthy: "bg-success/10 text-success border-success/20",
+  attention: "bg-warning/10 text-warning border-warning/20",
+  overrun: "bg-destructive/10 text-destructive border-destructive/20",
+};
 
 interface ProjectTaskNode extends Tarefa {
   children: ProjectTaskNode[];
@@ -213,14 +228,20 @@ export default function ProjetosPage() {
   };
 
   const handleExportPdf = () => {
-    const headers = ["ID do Projeto", "Unidade de Negócio", "Produto", "Projeto", "Responsável", "Prioridade", "Status", "Início Prev.", "Fim Prev.", "Conclusão", "Custo Planejado", "Orçamento Aprovado", "Valor Gasto"];
-    const rows = filtered.map(p => [p.projectId || "", p.businessUnitName || "", p.produtoName || "", p.projeto, p.responsavel, p.prioridade, p.status, p.dataInicioPlanej, p.dataFimPlanej, `${p.conclusao}%`, formatCurrency(p.valorPrevisto), formatCurrency(p.orcamentoAprovado || 0), formatCurrency(p.valorGasto)]);
+    const headers = ["ID do Projeto", "Unidade de Negócio", "Produto", "Projeto", "Responsável", "Prioridade", "Status", "Início Prev.", "Fim Prev.", "Conclusão", "Custo Planejado", "Orçamento Aprovado", "Valor Gasto", "EAC", "ETC", "Saldo Projetado", "Saúde Financeira"];
+    const rows = filtered.map((p) => {
+      const finance = calculateProjectFinancialMetrics(p);
+      return [p.projectId || "", p.businessUnitName || "", p.produtoName || "", p.projeto, p.responsavel, p.prioridade, p.status, p.dataInicioPlanej, p.dataFimPlanej, `${p.conclusao}%`, formatCurrency(finance.plannedCost), formatCurrency(finance.approvedBudget), formatCurrency(finance.spent), formatCurrency(finance.eac), formatCurrency(finance.etc), formatCurrency(finance.projectedBalance), FINANCIAL_STATUS_LABELS[finance.status]];
+    });
     exportToPdf("Relatório de Projetos", headers, rows, "projetos");
   };
 
   const handleExportExcel = () => {
-    const headers = ["ID do Projeto", "Unidade de Negócio", "Produto", "Projeto", "Responsável", "Prioridade", "Status", "Início Previsto", "Fim Previsto", "Conclusão %", "Custo Planejado", "Orçamento Aprovado", "Valor Gasto"];
-    const rows = filtered.map(p => [p.projectId || "", p.businessUnitName || "", p.produtoName || "", p.projeto, p.responsavel, p.prioridade, p.status, p.dataInicioPlanej, p.dataFimPlanej, p.conclusao, p.valorPrevisto, p.orcamentoAprovado || 0, p.valorGasto]);
+    const headers = ["ID do Projeto", "Unidade de Negócio", "Produto", "Projeto", "Responsável", "Prioridade", "Status", "Início Previsto", "Fim Previsto", "Conclusão %", "Custo Planejado", "Orçamento Aprovado", "Valor Gasto", "EAC", "ETC", "Saldo Projetado", "Saúde Financeira"];
+    const rows = filtered.map((p) => {
+      const finance = calculateProjectFinancialMetrics(p);
+      return [p.projectId || "", p.businessUnitName || "", p.produtoName || "", p.projeto, p.responsavel, p.prioridade, p.status, p.dataInicioPlanej, p.dataFimPlanej, p.conclusao, finance.plannedCost, finance.approvedBudget, finance.spent, finance.eac, finance.etc, finance.projectedBalance, FINANCIAL_STATUS_LABELS[finance.status]];
+    });
     exportToExcel(headers, rows, "projetos", "Projetos");
   };
 
@@ -414,7 +435,9 @@ export default function ProjetosPage() {
         </div>
 
         <div className="grid gap-4">
-          {filtered.map(p => (
+          {filtered.map(p => {
+            const finance = calculateProjectFinancialMetrics(p);
+            return (
             <Card key={p.id} className="border border-border hover:shadow-md transition-shadow">
               <CardContent className="p-5">
                 <div className="flex flex-col lg:flex-row lg:items-start gap-4">
@@ -425,6 +448,9 @@ export default function ProjetosPage() {
                       <Badge variant="outline" className="text-xs">{p.businessUnitName || "Sem BU"}</Badge>
                       {p.produtoName ? <Badge variant="outline" className="text-xs">{p.produtoName}</Badge> : null}
                       <StatusBadge status={p.status} />
+                      <span className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium ${FINANCIAL_STATUS_CLASSES[finance.status]}`}>
+                        {FINANCIAL_STATUS_LABELS[finance.status]}
+                      </span>
                       <Badge variant="outline" className="text-xs">{p.prioridade}</Badge>
                     </div>
                     <p className="text-sm text-muted-foreground">{p.descricao}</p>
@@ -481,11 +507,14 @@ export default function ProjetosPage() {
                 </div>
 
                 <div className="mt-4 flex flex-col lg:flex-row lg:items-center gap-4">
-                  <div className="flex gap-6 text-sm">
-                    <span className="text-muted-foreground">Planejado: <strong className="text-foreground">{formatCurrency(p.valorPrevisto)}</strong></span>
-                    <span className="text-muted-foreground">Aprovado: <strong className="text-foreground">{formatCurrency(p.orcamentoAprovado || 0)}</strong></span>
-                    <span className="text-muted-foreground">Gasto: <strong className="text-foreground">{formatCurrency(p.valorGasto)}</strong></span>
-                    <span className="text-muted-foreground">Saldo: <strong className={(Number(p.orcamentoAprovado || 0) - Number(p.valorGasto || 0)) < 0 ? "text-destructive" : "text-foreground"}>{formatCurrency(Number(p.orcamentoAprovado || 0) - Number(p.valorGasto || 0))}</strong></span>
+                  <div className="flex flex-wrap gap-x-6 gap-y-1 text-sm">
+                    <span className="text-muted-foreground">Planejado: <strong className="text-foreground">{formatCurrency(finance.plannedCost)}</strong></span>
+                    <span className="text-muted-foreground">Aprovado: <strong className="text-foreground">{formatCurrency(finance.approvedBudget)}</strong></span>
+                    <span className="text-muted-foreground">Gasto: <strong className="text-foreground">{formatCurrency(finance.spent)}</strong></span>
+                    <span className="text-muted-foreground">Saldo atual: <strong className={finance.actualBalance < 0 ? "text-destructive" : "text-foreground"}>{formatCurrency(finance.actualBalance)}</strong></span>
+                    <span className="text-muted-foreground">EAC: <strong className={finance.projectedBalance < 0 ? "text-destructive" : "text-foreground"}>{formatCurrency(finance.eac)}</strong></span>
+                    <span className="text-muted-foreground">ETC: <strong className="text-foreground">{formatCurrency(finance.etc)}</strong></span>
+                    <span className="text-muted-foreground">Saldo projetado: <strong className={finance.projectedBalance < 0 ? "text-destructive" : "text-foreground"}>{formatCurrency(finance.projectedBalance)}</strong></span>
                   </div>
                   <div className="flex-1 flex items-center gap-3">
                     <Progress value={p.conclusao} className="h-2 flex-1" />
@@ -500,7 +529,8 @@ export default function ProjetosPage() {
                 ) : null}
               </CardContent>
             </Card>
-          ))}
+          );
+          })}
         </div>
       </div>
 
