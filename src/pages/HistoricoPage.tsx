@@ -23,6 +23,14 @@ function formatDateTime(value?: string) {
   return date.toLocaleString("pt-BR");
 }
 
+function normalizeCommentType(value?: string): NonNullable<Comentario["commentType"]> {
+  return value === "decision" || value === "action" || value === "risk" || value === "issue" ? value : "comment";
+}
+
+function normalizeResolutionStatus(value?: string): NonNullable<Comentario["resolutionStatus"]> {
+  return value === "resolved" ? "resolved" : "open";
+}
+
 export default function HistoricoPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const { projetos, tarefas } = useData();
@@ -70,7 +78,7 @@ export default function HistoricoPage() {
         commentType: commentTypeFilter,
         resolutionStatus: resolutionStatusFilter,
       });
-      setComments(payload);
+      setComments(Array.isArray(payload) ? payload : []);
     } catch (error) {
       toast({ title: "Erro", description: (error as Error).message, variant: "destructive" });
     } finally {
@@ -87,7 +95,7 @@ export default function HistoricoPage() {
         entityType: auditEntityType !== "all" ? auditEntityType : undefined,
         search: auditSearch || undefined,
       });
-      setAuditLogs(payload);
+      setAuditLogs(Array.isArray(payload) ? payload : []);
     } catch (error) {
       toast({ title: "Erro", description: (error as Error).message, variant: "destructive" });
     } finally {
@@ -119,7 +127,13 @@ export default function HistoricoPage() {
     risk: "Risco",
     issue: "Impedimento",
   };
-  const openActionableCount = comments.filter((item) => item.resolutionStatus !== "resolved" && item.commentType && item.commentType !== "comment").length;
+  const safeComments = Array.isArray(comments) ? comments : [];
+  const safeAuditLogs = Array.isArray(auditLogs) ? auditLogs : [];
+  const openActionableCount = safeComments.filter((item) => {
+    const type = normalizeCommentType(item.commentType);
+    const status = normalizeResolutionStatus(item.resolutionStatus);
+    return status !== "resolved" && type !== "comment";
+  }).length;
 
   const handleSaveComment = async () => {
     try {
@@ -247,7 +261,7 @@ export default function HistoricoPage() {
                   </Select>
                 </div>
                 <div className="flex flex-wrap gap-2 text-sm text-muted-foreground">
-                  <Badge variant="outline">{comments.length} registros</Badge>
+                  <Badge variant="outline">{safeComments.length} registros</Badge>
                   <Badge variant={openActionableCount > 0 ? "destructive" : "secondary"}>{openActionableCount} acionáveis abertos</Badge>
                 </div>
 
@@ -296,20 +310,23 @@ export default function HistoricoPage() {
                 <div className="space-y-3">
                   {loadingComments ? (
                     <Card className="border border-border"><CardContent className="p-4 text-sm text-muted-foreground">Carregando comentários...</CardContent></Card>
-                  ) : comments.length === 0 ? (
+                  ) : safeComments.length === 0 ? (
                     <Card className="border border-border"><CardContent className="p-4 text-sm text-muted-foreground">Nenhum comentário encontrado para o filtro atual.</CardContent></Card>
-                  ) : comments.map((item) => (
-                    <Card key={item.id} className="border border-border">
+                  ) : safeComments.map((item, index) => {
+                    const type = normalizeCommentType(item.commentType);
+                    const status = normalizeResolutionStatus(item.resolutionStatus);
+                    return (
+                    <Card key={item.id || `${item.entityType}-${index}`} className="border border-border">
                       <CardContent className="space-y-3 p-4">
                         <div className="flex flex-wrap items-center gap-2">
                           <MessageSquare size={16} className="text-primary" />
                           <Badge variant="outline">{item.entityType === "projeto" ? "Projeto" : "Tarefa"}</Badge>
-                          <Badge variant={item.commentType === "issue" || item.commentType === "risk" ? "destructive" : "secondary"}>
-                            {commentTypeLabel[item.commentType || "comment"]}
+                          <Badge variant={type === "issue" || type === "risk" ? "destructive" : "secondary"}>
+                            {commentTypeLabel[type]}
                           </Badge>
-                          <Badge variant={item.resolutionStatus === "resolved" ? "secondary" : "outline"}>
-                            {item.resolutionStatus === "resolved" ? <CheckCircle2 size={12} className="mr-1" /> : <AlertTriangle size={12} className="mr-1" />}
-                            {item.resolutionStatus === "resolved" ? "Resolvido" : "Aberto"}
+                          <Badge variant={status === "resolved" ? "secondary" : "outline"}>
+                            {status === "resolved" ? <CheckCircle2 size={12} className="mr-1" /> : <AlertTriangle size={12} className="mr-1" />}
+                            {status === "resolved" ? "Resolvido" : "Aberto"}
                           </Badge>
                           {item.projectName ? <Badge variant="outline">{item.projectName}</Badge> : null}
                           {item.taskName ? <Badge variant="outline">{item.taskName}</Badge> : null}
@@ -334,10 +351,10 @@ export default function HistoricoPage() {
                                   setProjectId(item.projectId ? String(item.projectId) : "all");
                                   setTaskId(item.taskId || "all");
                                   setContent(item.content);
-                                  setCommentType(item.commentType || "comment");
+                                  setCommentType(type);
                                   setOwnerName(item.ownerName || "");
                                   setDueDate(item.dueDate || "");
-                                  setResolutionStatus(item.resolutionStatus || "open");
+                                  setResolutionStatus(status);
                                 }}
                               >
                                 <Pencil size={14} className="mr-1" /> Editar
@@ -350,7 +367,8 @@ export default function HistoricoPage() {
                         </div>
                       </CardContent>
                     </Card>
-                  ))}
+                  );
+                  })}
                 </div>
               </CardContent>
             </Card>
@@ -385,10 +403,10 @@ export default function HistoricoPage() {
                   <div className="space-y-3">
                     {loadingAudit ? (
                       <Card className="border border-border"><CardContent className="p-4 text-sm text-muted-foreground">Carregando auditoria...</CardContent></Card>
-                    ) : auditLogs.length === 0 ? (
+                    ) : safeAuditLogs.length === 0 ? (
                       <Card className="border border-border"><CardContent className="p-4 text-sm text-muted-foreground">Nenhum evento de auditoria encontrado.</CardContent></Card>
-                    ) : auditLogs.map((item) => (
-                      <Card key={item.id} className="border border-border">
+                    ) : safeAuditLogs.map((item, index) => (
+                      <Card key={item.id || `${item.entityType}-${index}`} className="border border-border">
                         <CardContent className="space-y-3 p-4">
                           <div className="flex flex-wrap items-center gap-2">
                             <History size={16} className="text-primary" />
