@@ -213,14 +213,14 @@ export default function ProjetosPage() {
   };
 
   const handleExportPdf = () => {
-    const headers = ["ID do Projeto", "Unidade de Negócio", "Produto", "Projeto", "Responsável", "Prioridade", "Status", "Início Prev.", "Fim Prev.", "Conclusão", "Valor Previsto", "Valor Gasto"];
-    const rows = filtered.map(p => [p.projectId || "", p.businessUnitName || "", p.produtoName || "", p.projeto, p.responsavel, p.prioridade, p.status, p.dataInicioPlanej, p.dataFimPlanej, `${p.conclusao}%`, formatCurrency(p.valorPrevisto), formatCurrency(p.valorGasto)]);
+    const headers = ["ID do Projeto", "Unidade de Negócio", "Produto", "Projeto", "Responsável", "Prioridade", "Status", "Início Prev.", "Fim Prev.", "Conclusão", "Custo Planejado", "Orçamento Aprovado", "Valor Gasto"];
+    const rows = filtered.map(p => [p.projectId || "", p.businessUnitName || "", p.produtoName || "", p.projeto, p.responsavel, p.prioridade, p.status, p.dataInicioPlanej, p.dataFimPlanej, `${p.conclusao}%`, formatCurrency(p.valorPrevisto), formatCurrency(p.orcamentoAprovado || 0), formatCurrency(p.valorGasto)]);
     exportToPdf("Relatório de Projetos", headers, rows, "projetos");
   };
 
   const handleExportExcel = () => {
-    const headers = ["ID do Projeto", "Unidade de Negócio", "Produto", "Projeto", "Responsável", "Prioridade", "Status", "Início Previsto", "Fim Previsto", "Conclusão %", "Valor Previsto", "Valor Gasto"];
-    const rows = filtered.map(p => [p.projectId || "", p.businessUnitName || "", p.produtoName || "", p.projeto, p.responsavel, p.prioridade, p.status, p.dataInicioPlanej, p.dataFimPlanej, p.conclusao, p.valorPrevisto, p.valorGasto]);
+    const headers = ["ID do Projeto", "Unidade de Negócio", "Produto", "Projeto", "Responsável", "Prioridade", "Status", "Início Previsto", "Fim Previsto", "Conclusão %", "Custo Planejado", "Orçamento Aprovado", "Valor Gasto"];
+    const rows = filtered.map(p => [p.projectId || "", p.businessUnitName || "", p.produtoName || "", p.projeto, p.responsavel, p.prioridade, p.status, p.dataInicioPlanej, p.dataFimPlanej, p.conclusao, p.valorPrevisto, p.orcamentoAprovado || 0, p.valorGasto]);
     exportToExcel(headers, rows, "projetos", "Projetos");
   };
 
@@ -482,8 +482,10 @@ export default function ProjetosPage() {
 
                 <div className="mt-4 flex flex-col lg:flex-row lg:items-center gap-4">
                   <div className="flex gap-6 text-sm">
-                    <span className="text-muted-foreground">Previsto: <strong className="text-foreground">{formatCurrency(p.valorPrevisto)}</strong></span>
+                    <span className="text-muted-foreground">Planejado: <strong className="text-foreground">{formatCurrency(p.valorPrevisto)}</strong></span>
+                    <span className="text-muted-foreground">Aprovado: <strong className="text-foreground">{formatCurrency(p.orcamentoAprovado || 0)}</strong></span>
                     <span className="text-muted-foreground">Gasto: <strong className="text-foreground">{formatCurrency(p.valorGasto)}</strong></span>
+                    <span className="text-muted-foreground">Saldo: <strong className={(Number(p.orcamentoAprovado || 0) - Number(p.valorGasto || 0)) < 0 ? "text-destructive" : "text-foreground"}>{formatCurrency(Number(p.orcamentoAprovado || 0) - Number(p.valorGasto || 0))}</strong></span>
                   </div>
                   <div className="flex-1 flex items-center gap-3">
                     <Progress value={p.conclusao} className="h-2 flex-1" />

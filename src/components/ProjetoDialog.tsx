@@ -33,6 +33,7 @@ const emptyProjeto: Omit<Projeto, "id"> = {
   responsavel: "",
   ftes: 0,
   valorPrevisto: 0,
+  orcamentoAprovado: 0,
   valorGasto: 0,
   dataInicioPlanej: "",
   dataFimPlanej: "",
@@ -273,8 +274,12 @@ export default function ProjetoDialog({ open, onOpenChange, projeto }: ProjetoDi
             <Input type="date" value={form.dataFimReal || ""} onChange={(e) => set("dataFimReal", e.target.value)} />
           </div>
           <div>
-            <Label>Valor Previsto</Label>
+            <Label>Custo planejado</Label>
             <Input type="number" step="0.01" value={form.valorPrevisto} onChange={(e) => set("valorPrevisto", parseFloat(e.target.value) || 0)} />
+          </div>
+          <div>
+            <Label>Orçamento aprovado</Label>
+            <Input type="number" step="0.01" value={form.orcamentoAprovado || 0} onChange={(e) => set("orcamentoAprovado", parseFloat(e.target.value) || 0)} />
           </div>
           <div>
             <Label>Valor Gasto</Label>

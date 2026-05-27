@@ -35,6 +35,7 @@ function mapProjeto(row) {
     responsavel: row.responsavel,
     ftes: parseFloat(row.ftes),
     valorPrevisto: parseFloat(row.valor_previsto),
+    orcamentoAprovado: parseFloat(row.orcamento_aprovado || 0),
     valorGasto: parseFloat(row.valor_gasto),
     dataInicioPlanej: pickDateValue(row.data_inicio_planej, row.data_inicio_planej_date),
     dataFimPlanej: pickDateValue(row.data_fim_planej, row.data_fim_planej_date),

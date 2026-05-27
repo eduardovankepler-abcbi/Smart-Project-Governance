@@ -175,8 +175,11 @@ export default function DashboardPage() {
   const totalTarefas = filteredProjetos.reduce((s, p) => s + p.totalTarefas, 0);
   const totalAtrasadas = filteredProjetos.reduce((s, p) => s + p.tarefasAtrasadas, 0);
   const valorPrevisto = filteredProjetos.reduce((s, p) => s + p.valorPrevisto, 0);
+  const orcamentoAprovado = filteredProjetos.reduce((s, p) => s + Number(p.orcamentoAprovado || 0), 0);
   const valorGasto = filteredProjetos.reduce((s, p) => s + p.valorGasto, 0);
   const execucao = valorPrevisto > 0 ? Math.round((valorGasto / valorPrevisto) * 100) : 0;
+  const consumoOrcamento = orcamentoAprovado > 0 ? Math.round((valorGasto / orcamentoAprovado) * 100) : 0;
+  const saldoOrcamento = orcamentoAprovado - valorGasto;
 
   const kpis = [
     {
@@ -212,7 +215,7 @@ export default function DashboardPage() {
       detailB: `${execucao}% execução`,
     },
     {
-      label: "Valor Previsto",
+      label: "Custo Planejado",
       value: formatCurrency(valorPrevisto),
       icon: DollarSign,
       color: "text-info",
@@ -220,12 +223,12 @@ export default function DashboardPage() {
       detailB: "valor gasto",
     },
     {
-      label: "Saúde Financeira",
-      value: `${execucao}%`,
+      label: "Orçamento",
+      value: formatCurrency(orcamentoAprovado),
       icon: CheckCircle,
-      color: "text-chart-3",
-      detailA: totalProjetos ? `${Math.max(totalProjetos - filteredProjetos.filter((item) => item.status === "Atrasado").length, 0)} dentro do plano` : "Sem base",
-      detailB: "comparação previsto x gasto",
+      color: saldoOrcamento < 0 ? "text-destructive" : "text-chart-3",
+      detailA: `${consumoOrcamento}% consumido`,
+      detailB: `saldo ${formatCurrency(saldoOrcamento)}`,
     },
   ];
 
@@ -294,13 +297,14 @@ export default function DashboardPage() {
 
   const renderFinancialComparisonChart = (height: number) => (
     <ResponsiveContainer width="100%" height={height}>
-      <BarChart data={filteredProjetos.map(p => ({ name: p.projeto, previsto: p.valorPrevisto, gasto: p.valorGasto }))} margin={{ left: 20 }}>
+      <BarChart data={filteredProjetos.map(p => ({ name: p.projeto, previsto: p.valorPrevisto, aprovado: Number(p.orcamentoAprovado || 0), gasto: p.valorGasto }))} margin={{ left: 20 }}>
         <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
         <XAxis dataKey="name" tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} angle={-20} textAnchor="end" height={60} />
         <YAxis tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} tickFormatter={(v) => `R$${(v / 1000).toFixed(0)}k`} />
         <Tooltip formatter={(v: number) => formatCurrency(v)} contentStyle={tooltipStyle} />
         <Legend />
-        <Bar dataKey="previsto" name="Valor Previsto" fill={COLORS[1]} radius={[4, 4, 0, 0]} />
+        <Bar dataKey="aprovado" name="Orçamento Aprovado" fill={COLORS[2]} radius={[4, 4, 0, 0]} />
+        <Bar dataKey="previsto" name="Custo Planejado" fill={COLORS[1]} radius={[4, 4, 0, 0]} />
         <Bar dataKey="gasto" name="Valor Gasto" fill={COLORS[0]} radius={[4, 4, 0, 0]} />
       </BarChart>
     </ResponsiveContainer>

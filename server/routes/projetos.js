@@ -65,8 +65,8 @@ module.exports = function (pool, auth) {
       const dataInicioReal = sanitizeString(b.dataInicio, 20);
       const dataFimReal = sanitizeString(b.dataFimReal, 50);
       const [result] = await pool.query(
-        `INSERT INTO projetos (project_code, project_type, business_unit_id, business_unit_nome, produto_id, produto_nome, projeto, descricao, prioridade, responsavel, ftes, valor_previsto, valor_gasto, data_inicio_planej, data_inicio_planej_date, data_fim_planej, data_fim_planej_date, data_inicio, data_inicio_real_date, data_fim_real, data_fim_real_date, total_tarefas, tarefas_concluidas, tarefas_andamento, tarefas_atrasadas, tarefas_nao_iniciadas, status, conclusao)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO projetos (project_code, project_type, business_unit_id, business_unit_nome, produto_id, produto_nome, projeto, descricao, prioridade, responsavel, ftes, valor_previsto, orcamento_aprovado, valor_gasto, data_inicio_planej, data_inicio_planej_date, data_fim_planej, data_fim_planej_date, data_inicio, data_inicio_real_date, data_fim_real, data_fim_real_date, total_tarefas, tarefas_concluidas, tarefas_andamento, tarefas_atrasadas, tarefas_nao_iniciadas, status, conclusao)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           projectCode,
           sanitizeString(b.projectType, 30) || "Projeto",
@@ -80,6 +80,7 @@ module.exports = function (pool, auth) {
           sanitizeString(b.responsavel, 200),
           sanitizeNumber(b.ftes),
           sanitizeNumber(b.valorPrevisto),
+          sanitizeNumber(b.orcamentoAprovado),
           sanitizeNumber(b.valorGasto),
           dataInicioPlanej,
           normalizeDateInput(dataInicioPlanej) || null,
@@ -146,7 +147,7 @@ module.exports = function (pool, auth) {
       const dataInicioReal = sanitizeString(b.dataInicio, 20);
       const dataFimReal = sanitizeString(b.dataFimReal, 50);
       await pool.query(
-        `UPDATE projetos SET project_code=?, project_type=?, business_unit_id=?, business_unit_nome=?, produto_id=?, produto_nome=?, projeto=?, descricao=?, prioridade=?, responsavel=?, ftes=?, valor_previsto=?, valor_gasto=?, data_inicio_planej=?, data_inicio_planej_date=?, data_fim_planej=?, data_fim_planej_date=?, data_inicio=?, data_inicio_real_date=?, data_fim_real=?, data_fim_real_date=?, total_tarefas=?, tarefas_concluidas=?, tarefas_andamento=?, tarefas_atrasadas=?, tarefas_nao_iniciadas=?, status=?, conclusao=? WHERE id=?`,
+        `UPDATE projetos SET project_code=?, project_type=?, business_unit_id=?, business_unit_nome=?, produto_id=?, produto_nome=?, projeto=?, descricao=?, prioridade=?, responsavel=?, ftes=?, valor_previsto=?, orcamento_aprovado=?, valor_gasto=?, data_inicio_planej=?, data_inicio_planej_date=?, data_fim_planej=?, data_fim_planej_date=?, data_inicio=?, data_inicio_real_date=?, data_fim_real=?, data_fim_real_date=?, total_tarefas=?, tarefas_concluidas=?, tarefas_andamento=?, tarefas_atrasadas=?, tarefas_nao_iniciadas=?, status=?, conclusao=? WHERE id=?`,
         [
           projectCode,
           sanitizeString(b.projectType, 30) || "Projeto",
@@ -160,6 +161,7 @@ module.exports = function (pool, auth) {
           sanitizeString(b.responsavel, 200),
           sanitizeNumber(b.ftes),
           sanitizeNumber(b.valorPrevisto),
+          sanitizeNumber(b.orcamentoAprovado),
           sanitizeNumber(b.valorGasto),
           dataInicioPlanej,
           normalizeDateInput(dataInicioPlanej) || null,

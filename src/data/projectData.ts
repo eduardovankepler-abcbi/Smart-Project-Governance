@@ -12,6 +12,7 @@ export interface Projeto {
   responsavel: string;
   ftes: number;
   valorPrevisto: number;
+  orcamentoAprovado?: number;
   valorGasto: number;
   dataInicioPlanej: string;
   dataFimPlanej: string;
