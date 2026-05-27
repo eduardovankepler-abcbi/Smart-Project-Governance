@@ -23,6 +23,16 @@ function formatDateTime(value?: string) {
   return date.toLocaleString("pt-BR");
 }
 
+function formatJsonDetails(value: unknown) {
+  if (value == null || value === "") return "—";
+  if (typeof value === "string") return value;
+  try {
+    return JSON.stringify(value, null, 2);
+  } catch {
+    return String(value);
+  }
+}
+
 function normalizeCommentType(value?: string): NonNullable<Comentario["commentType"]> {
   return value === "decision" || value === "action" || value === "risk" || value === "issue" ? value : "comment";
 }
@@ -424,11 +434,11 @@ export default function HistoricoPage() {
                               <div className="mt-3 grid gap-3 lg:grid-cols-2">
                                 <div>
                                   <p className="mb-1 font-medium text-foreground">Antes</p>
-                                  <pre className="whitespace-pre-wrap break-words">{item.beforeJson || "—"}</pre>
+                                  <pre className="whitespace-pre-wrap break-words">{formatJsonDetails(item.beforeJson)}</pre>
                                 </div>
                                 <div>
                                   <p className="mb-1 font-medium text-foreground">Depois</p>
-                                  <pre className="whitespace-pre-wrap break-words">{item.afterJson || "—"}</pre>
+                                  <pre className="whitespace-pre-wrap break-words">{formatJsonDetails(item.afterJson)}</pre>
                                 </div>
                               </div>
                             </details>
