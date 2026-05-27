@@ -110,19 +110,38 @@ function formatWeekLabel(date) {
   return `${day}/${month}`;
 }
 
-function cumulativeLinearValue(total, startDate, finishDate, pointDate) {
+function isBusinessDayUtc(date) {
+  const day = date.getUTCDay();
+  return day !== 0 && day !== 6;
+}
+
+function addDaysUtc(date, amount) {
+  const result = new Date(date.getTime());
+  result.setUTCDate(result.getUTCDate() + amount);
+  return result;
+}
+
+function countBusinessDaysInclusive(startDate, finishDate) {
+  if (!startDate || !finishDate || finishDate.getTime() < startDate.getTime()) return 0;
+  let total = 0;
+  for (let cursor = startDate; cursor.getTime() <= finishDate.getTime(); cursor = addDaysUtc(cursor, 1)) {
+    if (isBusinessDayUtc(cursor)) total++;
+  }
+  return total;
+}
+
+function cumulativeBusinessDayValue(total, startDate, finishDate, pointDate) {
   if (!startDate && !finishDate) return 0;
   const start = startDate || finishDate;
   const finish = finishDate || startDate || startDate;
   if (!start || !finish) return 0;
-  const startTime = start.getTime();
-  const finishTime = finish.getTime();
-  const pointTime = pointDate.getTime();
+  if (pointDate.getTime() < start.getTime()) return 0;
+  if (pointDate.getTime() >= finish.getTime()) return total;
 
-  if (finishTime <= startTime) return pointTime >= finishTime ? total : 0;
-  if (pointTime <= startTime) return 0;
-  if (pointTime >= finishTime) return total;
-  return total * clamp((pointTime - startTime) / (finishTime - startTime));
+  const totalBusinessDays = countBusinessDaysInclusive(start, finish);
+  if (!totalBusinessDays) return 0;
+  const elapsedBusinessDays = countBusinessDaysInclusive(start, pointDate);
+  return total * clamp(elapsedBusinessDays / totalBusinessDays);
 }
 
 async function getProjectOrThrow(connection, projectId) {
@@ -445,7 +464,7 @@ function buildWeeklyCurve(projectRow, baselineRow, baselineTasks, liveTasks, met
       planned = baselineTasks.reduce((sum, task) => {
         const { start, finish } = extractPlannedDatesFromSnapshot(task);
         const weight = getProgressWeight(task);
-        return sum + (weight * cumulativeLinearValue(1, start, finish, effectivePoint));
+        return sum + (weight * cumulativeBusinessDayValue(1, start, finish, effectivePoint));
       }, 0);
 
       actual = liveTasks.reduce((sum, task) => {
@@ -457,7 +476,7 @@ function buildWeeklyCurve(projectRow, baselineRow, baselineTasks, liveTasks, met
         if (weekEnd.getTime() > currentDate.getTime()) {
           return sum + weight * finalPercent;
         }
-        return sum + (weight * finalPercent * cumulativeLinearValue(1, start, finish || plannedFinish || start, effectivePoint));
+        return sum + (weight * finalPercent * cumulativeBusinessDayValue(1, start, finish || plannedFinish || start, effectivePoint));
       }, 0);
 
       planned = Number(((planned / totalProgressWeight) * 100).toFixed(2));
@@ -465,7 +484,7 @@ function buildWeeklyCurve(projectRow, baselineRow, baselineTasks, liveTasks, met
     } else {
       planned = baselineTasks.reduce((sum, task) => {
         const { start, finish } = extractPlannedDatesFromSnapshot(task);
-        return sum + cumulativeLinearValue(computePlanTotal(task, metric), start, finish, effectivePoint);
+        return sum + cumulativeBusinessDayValue(computePlanTotal(task, metric), start, finish, effectivePoint);
       }, 0);
 
       actual = liveTasks.reduce((sum, task) => {
@@ -474,7 +493,7 @@ function buildWeeklyCurve(projectRow, baselineRow, baselineTasks, liveTasks, met
         if (total <= 0) return sum;
         const start = actualStart || plannedStart;
         const finish = actualFinish || effectivePoint || plannedFinish || start;
-        return sum + cumulativeLinearValue(total, start, finish, effectivePoint);
+        return sum + cumulativeBusinessDayValue(total, start, finish, effectivePoint);
       }, 0);
 
       planned = Number(planned.toFixed(2));
@@ -557,6 +576,8 @@ module.exports = {
   CURVE_METRICS,
   createError,
   mapBaseline,
+  cumulativeBusinessDayValue,
+  countBusinessDaysInclusive,
   createProjectBaseline,
   approveProjectBaseline,
   rejectProjectBaseline,
