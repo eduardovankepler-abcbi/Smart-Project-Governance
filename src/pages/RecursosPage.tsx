@@ -15,7 +15,7 @@ import RecursoDialog from "@/components/RecursoDialog";
 import DeleteDialog from "@/components/DeleteDialog";
 import ChartPreviewModal from "@/components/ChartPreviewModal";
 import type { Recurso } from "@/data/projectData";
-import { getTaskResourceNames } from "@/utils/projectModel";
+import { findProjectForTask, getTaskResourceNames } from "@/utils/projectModel";
 import { formatCapacityPercent, normalizeMaxUnits } from "@/utils/resourceCapacity";
 
 interface RecursoInfo {
@@ -42,7 +42,7 @@ interface RecursoInfo {
 }
 
 export default function RecursosPage() {
-  const { recursos, setRecursos, refreshRecursos, tarefas } = useData();
+  const { projetos, recursos, setRecursos, refreshRecursos, tarefas } = useData();
   const { canWrite } = useAuth();
   const { toast } = useToast();
   const [search, setSearch] = useState("");
@@ -59,7 +59,7 @@ export default function RecursosPage() {
         const tarefasDoRecurso = tarefas.filter(t =>
           getTaskResourceNames(t).includes(r.nome)
         );
-        const projetosSet = new Set(tarefasDoRecurso.map(t => t.projeto));
+        const projetosSet = new Set(tarefasDoRecurso.map(t => findProjectForTask(t, projetos)?.projeto || t.projeto));
         const concluidas = tarefasDoRecurso.filter(t => t.status === "Concluído").length;
         const andamento = tarefasDoRecurso.filter(t => t.status === "Em andamento").length;
         const atrasadas = tarefasDoRecurso.filter(t => t.status === "Atrasado").length;
@@ -93,7 +93,7 @@ export default function RecursosPage() {
         };
       })
       .sort((a, b) => b.totalTarefas - a.totalTarefas);
-  }, [recursos, tarefas, search]);
+  }, [projetos, recursos, tarefas, search]);
 
   const chartData = useMemo(() => {
     return recursosInfo

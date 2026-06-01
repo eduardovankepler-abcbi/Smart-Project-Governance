@@ -15,6 +15,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { MessageSquare, History, Pencil, Trash2, CheckCircle2, AlertTriangle } from "lucide-react";
 import { buildTaskDisplayLabel } from "@/utils/taskIdentity";
+import { getTasksForProject } from "@/utils/projectModel";
 
 function formatDateTime(value?: string) {
   if (!value) return "—";
@@ -75,8 +76,8 @@ export default function HistoricoPage() {
 
   const filteredTasks = useMemo(() => {
     if (projectId === "all") return tarefas;
-    const projectName = projetos.find((item) => item.id === Number(projectId))?.projeto;
-    return tarefas.filter((item) => item.projeto === projectName);
+    const project = projetos.find((item) => item.id === Number(projectId));
+    return project ? getTasksForProject(tarefas, project) : [];
   }, [tarefas, projetos, projectId]);
 
   const loadComments = async () => {

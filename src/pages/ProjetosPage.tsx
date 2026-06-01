@@ -19,7 +19,7 @@ import ProjectTemplateDialog from "@/components/ProjectTemplateDialog";
 import DeleteDialog from "@/components/DeleteDialog";
 import type { Projeto, Tarefa } from "@/data/projectData";
 import { getTaskBusinessId, getTaskDisplayHierarchy } from "@/utils/taskIdentity";
-import { getTaskResourceNames } from "@/utils/projectModel";
+import { getTasksForProject, getTaskResourceNames } from "@/utils/projectModel";
 import { calculateProjectFinancialMetrics, type FinancialStatus } from "@/utils/financialMetrics";
 
 function StatusBadge({ status }: { status: string }) {
@@ -121,7 +121,7 @@ export default function ProjetosPage() {
   const taskTreesByProject = useMemo(() => {
     const grouped = new Map<string, ProjectTaskNode[]>();
     projetos.forEach((project) => {
-      const projectTasks = tarefas.filter((task) => task.projeto === project.projeto);
+      const projectTasks = getTasksForProject(tarefas, project);
       grouped.set(project.projeto, buildProjectTaskTree(projectTasks));
     });
     return grouped;
@@ -322,7 +322,7 @@ export default function ProjetosPage() {
 
   const renderProjectDrilldown = (project: Projeto, mode: "inline" | "modal" = "inline") => {
     const tree = taskTreesByProject.get(project.projeto) || [];
-    const totalItems = tarefas.filter((task) => task.projeto === project.projeto).length;
+    const totalItems = getTasksForProject(tarefas, project).length;
 
     return (
       <div className={`space-y-3 rounded-2xl border border-border/70 bg-card/50 ${mode === "modal" ? "p-5" : "p-4"}`}>

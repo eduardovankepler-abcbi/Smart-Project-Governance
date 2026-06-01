@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend, LineChart, Line } from "recharts";
 import { TrendingUp, AlertTriangle, CheckCircle, Clock, DollarSign, FolderKanban, GitBranch, ListTodo, Plus, ArrowUpRight, Gauge } from "lucide-react";
-import { getTaskResourceNames } from "@/utils/projectModel";
+import { getProjectTasksByName, getTaskResourceNames } from "@/utils/projectModel";
 import BaselineGovernancePanel from "@/components/BaselineGovernancePanel";
 import ChartPreviewModal from "@/components/ChartPreviewModal";
 import { useAuth } from "@/contexts/AuthContext";
@@ -73,8 +73,8 @@ export default function DashboardPage() {
 
   const filteredTarefas = useMemo(() => {
     if (filterProjeto === "all") return tarefas;
-    return tarefas.filter(t => t.projeto === filterProjeto);
-  }, [filterProjeto, tarefas]);
+    return getProjectTasksByName(tarefas, projetos, filterProjeto);
+  }, [filterProjeto, projetos, tarefas]);
 
   const selectedProject = useMemo(
     () => projetos.find((project) => project.projeto === filterProjeto) || null,

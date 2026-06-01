@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { AlertTriangle, CalendarRange, CheckCircle2, Gauge, Users } from "lucide-react";
 import { ResponsiveContainer, BarChart, Bar, CartesianGrid, XAxis, YAxis, Tooltip } from "recharts";
-import { getTaskResourceNames } from "@/utils/projectModel";
+import { findProjectForTask, getTaskResourceNames } from "@/utils/projectModel";
 import { normalizeMaxUnits } from "@/utils/resourceCapacity";
 import ChartPreviewModal from "@/components/ChartPreviewModal";
 
@@ -225,7 +225,7 @@ export default function CapacidadePage() {
         return task.assignments.map((assignment) => ({
           resourceId: assignment.resourceId,
           resourceName: assignment.resourceName,
-          projeto: task.projeto,
+          projeto: findProjectForTask(task, projetos)?.projeto || task.projeto,
           tarefa: task.tarefa,
           units: Number(assignment.units || 0),
           work: Number(assignment.work || 0) * overlapFactor,
@@ -243,7 +243,7 @@ export default function CapacidadePage() {
 
       return names.map((resourceName) => ({
         resourceName,
-        projeto: task.projeto,
+        projeto: findProjectForTask(task, projetos)?.projeto || task.projeto,
         tarefa: task.tarefa,
         units: 1 / splitFactor,
         work: (Number(task.esforcoPlanej || 0) / splitFactor) * overlapFactor,

@@ -3,7 +3,7 @@ import Header from "@/components/Header";
 import { useData } from "@/contexts/DataContext";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent } from "@/components/ui/card";
-import { getTaskResourceLabel, getTaskResourceNames } from "@/utils/projectModel";
+import { getProjectTasksByName, getTaskResourceLabel, getTaskResourceNames } from "@/utils/projectModel";
 
 function parseDate(dateStr: string): Date | null {
   if (!dateStr) return null;
@@ -29,7 +29,7 @@ const STATUS_COLORS: Record<string, string> = {
 };
 
 export default function GanttPage() {
-  const { tarefas, getUniqueProjetos, getUniqueResponsaveis } = useData();
+  const { projetos, tarefas, getUniqueProjetos, getUniqueResponsaveis } = useData();
   const [filterResponsavel, setFilterResponsavel] = useState<string>("all");
   const [filterProjeto, setFilterProjeto] = useState<string>("all");
 
@@ -37,14 +37,14 @@ export default function GanttPage() {
   const projetosUnicos = useMemo(() => getUniqueProjetos(), [getUniqueProjetos]);
 
   const filtered = useMemo(() => {
-    return tarefas.filter(t => {
+    const projectTasks = filterProjeto === "all" ? tarefas : getProjectTasksByName(tarefas, projetos, filterProjeto);
+    return projectTasks.filter(t => {
       const start = parseDate(t.dataInicioPlanej);
       if (!start) return false;
-      if (filterProjeto !== "all" && t.projeto !== filterProjeto) return false;
       if (filterResponsavel !== "all" && !getTaskResourceNames(t).includes(filterResponsavel)) return false;
       return true;
     });
-  }, [tarefas, filterResponsavel, filterProjeto]);
+  }, [projetos, tarefas, filterResponsavel, filterProjeto]);
 
   const { minDate, maxDate, totalDays } = useMemo(() => {
     let min = Infinity;

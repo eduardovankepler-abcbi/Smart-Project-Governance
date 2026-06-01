@@ -105,6 +105,7 @@ export interface AuditLog {
 export interface Tarefa {
   id: string;
   parentId: string;
+  projectId?: number;
   externalId?: string;
   wbs?: string;
   outlineLevel?: number;

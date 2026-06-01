@@ -13,7 +13,7 @@ import { useToast } from "@/hooks/use-toast";
 import * as api from "@/services/api";
 import { isApiEnabled } from "@/config/api";
 import { useData } from "@/contexts/DataContext";
-import { getTaskPredecessorLabel, getTaskResourceLabel } from "@/utils/projectModel";
+import { getProjectTasksByName, getTaskPredecessorLabel, getTaskResourceLabel } from "@/utils/projectModel";
 import {
   MAX_TASK_WBS_DEPTH,
   buildTaskDisplayLabel,
@@ -53,12 +53,16 @@ const emptyTarefa: Tarefa = {
 
 export default function TarefaDialog({ open, onOpenChange, tarefa, defaultParentId, defaultProjeto, mode = defaultParentId ? "subtask" : "task" }: TarefaDialogProps) {
   const isEdit = !!tarefa;
-  const { refreshTarefas, tarefas, recursos, setTarefas, getUniqueProjetos } = useData();
+  const { projetos, refreshTarefas, tarefas, recursos, setTarefas, getUniqueProjetos } = useData();
   const { toast } = useToast();
   const [predecessorInput, setPredecessorInput] = useState("");
   const [selectedResourceNames, setSelectedResourceNames] = useState<string[]>([]);
   const [legacyResourceNames, setLegacyResourceNames] = useState<string[]>([]);
   const [resourcePickerOpen, setResourcePickerOpen] = useState(false);
+
+  function getSelectedProjectId(projectName: string) {
+    return projetos.find((project) => project.projeto === projectName)?.id;
+  }
 
   const initialForm = (): Tarefa => {
     if (tarefa) return { ...emptyTarefa, ...tarefa };
@@ -70,7 +74,7 @@ export default function TarefaDialog({ open, onOpenChange, tarefa, defaultParent
       if (parent) form.projeto = parent.projeto;
     }
     if (form.projeto) {
-      const generated = generateTaskIdentifiers(form.projeto, form.parentId, tarefas);
+      const generated = generateTaskIdentifiers(form.projeto, form.parentId, tarefas, getSelectedProjectId(form.projeto));
       form.id = generated.id;
       form.externalId = generated.externalId;
       form.wbs = generated.wbs;
@@ -120,7 +124,7 @@ export default function TarefaDialog({ open, onOpenChange, tarefa, defaultParent
 
   const regenerateIdentifiers = (projeto: string, parentId: string) => {
     if (!projeto) return;
-    const generated = generateTaskIdentifiers(projeto, parentId, tarefas);
+    const generated = generateTaskIdentifiers(projeto, parentId, tarefas, getSelectedProjectId(projeto));
     setForm((current) => ({
       ...current,
       id: generated.id,
@@ -133,15 +137,15 @@ export default function TarefaDialog({ open, onOpenChange, tarefa, defaultParent
 
   const availableParents = useMemo(() => {
     if (!form.projeto) return [];
-    return tarefas.filter((item) => item.projeto === form.projeto && getTaskHierarchyDepth(item) < MAX_TASK_WBS_DEPTH && item.id !== form.id);
-  }, [tarefas, form.projeto, form.id]);
+    return getProjectTasksByName(tarefas, projetos, form.projeto).filter((item) => getTaskHierarchyDepth(item) < MAX_TASK_WBS_DEPTH && item.id !== form.id);
+  }, [projetos, tarefas, form.projeto, form.id]);
 
   const blockedParents = useMemo(() => {
     if (!form.projeto) return [];
-    return tarefas
-      .filter((item) => item.projeto === form.projeto && getTaskHierarchyDepth(item) >= MAX_TASK_WBS_DEPTH && item.id !== form.id)
+    return getProjectTasksByName(tarefas, projetos, form.projeto)
+      .filter((item) => getTaskHierarchyDepth(item) >= MAX_TASK_WBS_DEPTH && item.id !== form.id)
       .sort((a, b) => getTaskDisplayHierarchy(a).localeCompare(getTaskDisplayHierarchy(b), undefined, { numeric: true }));
-  }, [tarefas, form.projeto, form.id]);
+  }, [projetos, tarefas, form.projeto, form.id]);
 
   const groupedAvailableParents = useMemo(() => {
     const groups = new Map<string, Tarefa[]>();
@@ -217,7 +221,7 @@ export default function TarefaDialog({ open, onOpenChange, tarefa, defaultParent
       const match = value.match(/^(.+?)(?:\s+\((FS|SS|FF|SF)\))?$/i);
       const reference = match?.[1]?.trim() || value;
       return {
-        predecessorTaskId: resolveTaskReference(reference, form.projeto, tarefas),
+        predecessorTaskId: resolveTaskReference(reference, form.projeto, tarefas, getSelectedProjectId(form.projeto)),
         type: (match?.[2] || "FS").toUpperCase(),
         lagMinutes: 0,
       };
@@ -275,7 +279,7 @@ export default function TarefaDialog({ open, onOpenChange, tarefa, defaultParent
     }
   };
 
-  const projetos = getUniqueProjetos();
+  const projectNames = getUniqueProjetos();
   const selectedResources = selectedResourceNames
     .map((name) => recursos.find((item) => item.nome === name))
     .filter((item): item is NonNullable<typeof item> => !!item);
@@ -324,7 +328,7 @@ export default function TarefaDialog({ open, onOpenChange, tarefa, defaultParent
             <Label>Projeto *</Label>
             <Select value={form.projeto} onValueChange={handleProjetoChange} disabled={!!defaultProjeto || isEdit}>
               <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
-              <SelectContent>{projetos.map((projeto) => <SelectItem key={projeto} value={projeto}>{projeto}</SelectItem>)}</SelectContent>
+              <SelectContent>{projectNames.map((projeto) => <SelectItem key={projeto} value={projeto}>{projeto}</SelectItem>)}</SelectContent>
             </Select>
           </div>
           {mode === "subtask" ? (

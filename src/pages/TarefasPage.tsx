@@ -15,7 +15,7 @@ import { isApiEnabled } from "@/config/api";
 import TarefaDialog from "@/components/TarefaDialog";
 import DeleteDialog from "@/components/DeleteDialog";
 import type { Tarefa } from "@/data/projectData";
-import { formatDurationHours, getTaskPredecessorLabel, getTaskResourceLabel, getTaskResourceNames } from "@/utils/projectModel";
+import { formatDurationHours, getProjectTasksByName, getTaskPredecessorLabel, getTaskResourceLabel, getTaskResourceNames } from "@/utils/projectModel";
 import { getTaskBusinessId, getTaskDisplayHierarchy, MAX_TASK_WBS_DEPTH } from "@/utils/taskIdentity";
 
 function StatusDot({ status }: { status: string }) {
@@ -85,7 +85,7 @@ function flattenTree(nodes: TreeNode[], expanded: Set<string>): TreeNode[] {
 }
 
 export default function TarefasPage() {
-  const { tarefas, setTarefas, refreshTarefas, getUniqueProjetos, getUniqueResponsaveis } = useData();
+  const { projetos, tarefas, setTarefas, refreshTarefas, getUniqueProjetos, getUniqueResponsaveis } = useData();
   const { canWrite } = useAuth();
   const { toast } = useToast();
   const [filterResponsavel, setFilterResponsavel] = useState("all");
@@ -122,8 +122,8 @@ export default function TarefasPage() {
   const collapseAll = useCallback(() => setExpanded(new Set()), []);
 
   const filtered = useMemo(() => {
-    let result = tarefas.filter(t => {
-      if (filterProjeto !== "all" && t.projeto !== filterProjeto) return false;
+    const projectTasks = filterProjeto === "all" ? tarefas : getProjectTasksByName(tarefas, projetos, filterProjeto);
+    let result = projectTasks.filter(t => {
       if (filterResponsavel !== "all" && !getTaskResourceNames(t).includes(filterResponsavel)) return false;
       if (filterStatus !== "all" && t.status !== filterStatus) return false;
       if (t.percentual < percentRange[0] || t.percentual > percentRange[1]) return false;
@@ -136,7 +136,7 @@ export default function TarefasPage() {
       return sortAsc ? (Number(av) - Number(bv)) : (Number(bv) - Number(av));
     });
     return result;
-  }, [tarefas, filterResponsavel, filterProjeto, filterStatus, search, percentRange, sortBy, sortAsc]);
+  }, [projetos, tarefas, filterResponsavel, filterProjeto, filterStatus, search, percentRange, sortBy, sortAsc]);
 
   const tree = useMemo(() => buildTree(filtered), [filtered]);
   const visibleRows = useMemo(() => flattenTree(tree, expanded), [tree, expanded]);

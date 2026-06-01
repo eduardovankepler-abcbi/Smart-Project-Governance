@@ -1,4 +1,5 @@
 import type { Tarefa } from "@/data/projectData";
+import { getTaskProjectId } from "@/utils/projectModel";
 
 export const MAX_TASK_WBS_DEPTH = 5;
 
@@ -49,8 +50,16 @@ export function buildTaskIndentLabel(task: Tarefa): string {
   return `${prefix}${buildTaskDisplayLabel(task)}`;
 }
 
-export function generateTaskIdentifiers(projectName: string, parentTaskId: string, existingTasks: Tarefa[]) {
-  const sameProjectTasks = existingTasks.filter((task) => task.projeto === projectName);
+function filterSameProjectTasks(existingTasks: Tarefa[], projectName: string, projectId?: number): Tarefa[] {
+  return existingTasks.filter((task) => {
+    const taskProjectId = getTaskProjectId(task);
+    if (projectId && taskProjectId) return taskProjectId === projectId;
+    return task.projeto === projectName;
+  });
+}
+
+export function generateTaskIdentifiers(projectName: string, parentTaskId: string, existingTasks: Tarefa[], projectId?: number) {
+  const sameProjectTasks = filterSameProjectTasks(existingTasks, projectName, projectId);
   const nextSequence = sameProjectTasks.reduce((max, task, index) => {
     const explicit = Number.parseInt(String(task.externalId || ""), 10);
     if (Number.isFinite(explicit) && explicit > 0) return Math.max(max, explicit);
@@ -91,12 +100,12 @@ export function generateTaskIdentifiers(projectName: string, parentTaskId: strin
   };
 }
 
-export function resolveTaskReference(input: string, currentProject: string, tasks: Tarefa[]): string {
+export function resolveTaskReference(input: string, currentProject: string, tasks: Tarefa[], projectId?: number): string {
   const value = String(input || "").trim();
   if (!value) return "";
 
-  const sameProjectTasks = tasks.filter((task) => task.projeto === currentProject);
-  const direct = sameProjectTasks.find((task) =>
+  const projectTasks = filterSameProjectTasks(tasks, currentProject, projectId);
+  const direct = projectTasks.find((task) =>
     task.id === value ||
     getTaskDisplayHierarchy(task) === value ||
     getTaskBusinessId(task) === value
