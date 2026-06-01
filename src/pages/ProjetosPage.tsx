@@ -439,14 +439,14 @@ export default function ProjetosPage() {
           {filtered.map(p => {
             const finance = calculateProjectFinancialMetrics(p);
             return (
-            <Card key={p.id} className="border border-border hover:shadow-md transition-shadow">
+            <Card key={p.id} className="overflow-hidden border border-border transition-shadow hover:shadow-md">
               <CardContent className="p-5">
-                <div className="flex flex-col lg:flex-row lg:items-start gap-4">
-                  <div className="flex-1 space-y-2">
-                    <div className="flex items-center gap-3">
-                      <h3 className="text-base font-display font-bold text-foreground">{p.projeto}</h3>
-                      <Badge variant="outline" className="text-xs font-mono">{p.projectId || "sem-id"}</Badge>
-                      <Badge variant="outline" className="text-xs">{p.businessUnitName || "Sem BU"}</Badge>
+                <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_auto] xl:items-start">
+                  <div className="min-w-0 space-y-3">
+                    <div className="flex min-w-0 flex-wrap items-start gap-2">
+                      <h3 className="min-w-[220px] max-w-full break-words text-base font-display font-bold text-foreground sm:min-w-0 sm:max-w-[420px]">{p.projeto}</h3>
+                      <Badge variant="outline" className="max-w-full break-all text-xs font-mono">{p.projectId || "sem-id"}</Badge>
+                      <Badge variant="outline" className="max-w-full break-words text-xs">{p.businessUnitName || "Sem BU"}</Badge>
                       {p.produtoName ? <Badge variant="outline" className="text-xs">{p.produtoName}</Badge> : null}
                       <StatusBadge status={p.status} />
                       <span className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium ${FINANCIAL_STATUS_CLASSES[finance.status]}`}>
@@ -466,49 +466,51 @@ export default function ProjetosPage() {
                     </div>
                   </div>
 
-                  <div className="flex items-start gap-2">
-                    <div className="flex flex-wrap gap-4 lg:gap-6 text-center">
-                      <div>
+                  <div className="flex min-w-0 flex-col gap-3 xl:items-end">
+                    <div className="grid w-full grid-cols-2 gap-3 text-center sm:grid-cols-4 xl:w-auto xl:grid-cols-4">
+                      <div className="rounded-lg border border-border/60 bg-background/30 px-3 py-2">
                         <p className="text-xs text-muted-foreground">Total</p>
                         <p className="text-lg font-display font-bold text-foreground">{p.totalTarefas}</p>
                       </div>
-                      <div>
+                      <div className="rounded-lg border border-border/60 bg-background/30 px-3 py-2">
                         <p className="text-xs text-muted-foreground">Atrasadas</p>
                         <p className="text-lg font-display font-bold text-destructive">{p.tarefasAtrasadas}</p>
                       </div>
-                      <div>
+                      <div className="rounded-lg border border-border/60 bg-background/30 px-3 py-2">
                         <p className="text-xs text-muted-foreground">Andamento</p>
                         <p className="text-lg font-display font-bold text-warning">{p.tarefasAndamento}</p>
                       </div>
-                      <div>
+                      <div className="rounded-lg border border-border/60 bg-background/30 px-3 py-2">
                         <p className="text-xs text-muted-foreground">Concluídas</p>
                         <p className="text-lg font-display font-bold text-success">{p.tarefasConcluidas}</p>
                       </div>
                     </div>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="ml-2 gap-1.5"
-                      onClick={() => toggleProjectDrilldown(p.id)}
-                    >
-                      {expandedProjects.has(p.id) ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-                      Estrutura
-                    </Button>
-                    {canWrite && (
-                      <div className="flex flex-col gap-1 ml-4">
+                    <div className="flex flex-wrap justify-end gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="gap-1.5"
+                        onClick={() => toggleProjectDrilldown(p.id)}
+                      >
+                        {expandedProjects.has(p.id) ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                        Estrutura
+                      </Button>
+                      {canWrite && (
+                        <>
                         <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => { setEditProjeto(p); setDialogOpen(true); }}>
                           <Pencil size={14} />
                         </Button>
                         <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => setDeleteTarget(p)}>
                           <Trash2 size={14} />
                         </Button>
-                      </div>
-                    )}
+                        </>
+                      )}
+                    </div>
                   </div>
                 </div>
 
-                <div className="mt-4 flex flex-col lg:flex-row lg:items-center gap-4">
-                  <div className="flex flex-wrap gap-x-6 gap-y-1 text-sm">
+                <div className="mt-4 grid gap-4 xl:grid-cols-[minmax(0,1fr)_260px] xl:items-center">
+                  <div className="flex min-w-0 flex-wrap gap-x-5 gap-y-2 text-sm">
                     <span className="text-muted-foreground">Planejado: <strong className="text-foreground">{formatCurrency(finance.plannedCost)}</strong></span>
                     <span className="text-muted-foreground">Aprovado: <strong className="text-foreground">{formatCurrency(finance.approvedBudget)}</strong></span>
                     <span className="text-muted-foreground">Gasto: <strong className="text-foreground">{formatCurrency(finance.spent)}</strong></span>
@@ -517,8 +519,8 @@ export default function ProjetosPage() {
                     <span className="text-muted-foreground">ETC: <strong className="text-foreground">{formatCurrency(finance.etc)}</strong></span>
                     <span className="text-muted-foreground">Saldo projetado: <strong className={finance.projectedBalance < 0 ? "text-destructive" : "text-foreground"}>{formatCurrency(finance.projectedBalance)}</strong></span>
                   </div>
-                  <div className="flex-1 flex items-center gap-3">
-                    <Progress value={p.conclusao} className="h-2 flex-1" />
+                  <div className="flex min-w-0 items-center gap-3">
+                    <Progress value={p.conclusao} className="h-2 min-w-0 flex-1" />
                     <span className="text-xs font-medium text-muted-foreground">{p.conclusao}%</span>
                   </div>
                 </div>

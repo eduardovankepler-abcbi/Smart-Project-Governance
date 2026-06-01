@@ -217,82 +217,87 @@ export default function TarefasPage() {
     <div className="flex flex-col">
       <Header title="Tarefas" />
       <div className="p-6 space-y-4 animate-fade-in">
-        <div className="flex flex-wrap gap-3 items-end">
-          <Input placeholder="Buscar tarefa..." value={search} onChange={e => setSearch(e.target.value)} className="w-64" />
-          <Select value={filterProjeto} onValueChange={setFilterProjeto}>
-            <SelectTrigger className="w-52"><SelectValue placeholder="Projeto" /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todos os Projetos</SelectItem>
-              {projetosUnicos.map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}
-            </SelectContent>
-          </Select>
-          <Select value={filterResponsavel} onValueChange={setFilterResponsavel}>
-            <SelectTrigger className="w-52"><SelectValue placeholder="Responsável" /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todos os Responsáveis</SelectItem>
-              {responsaveis.map(r => <SelectItem key={r} value={r}>{r}</SelectItem>)}
-            </SelectContent>
-          </Select>
-          <Select value={filterStatus} onValueChange={setFilterStatus}>
-            <SelectTrigger className="w-44"><SelectValue placeholder="Status" /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todos os Status</SelectItem>
-              {STATUS_OPTIONS.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
-            </SelectContent>
-          </Select>
-        </div>
+        <div className="rounded-2xl border border-border/70 bg-card/70 p-4 shadow-sm">
+          <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_auto] xl:items-start">
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-[minmax(220px,320px)_220px_220px_180px]">
+              <Input placeholder="Buscar tarefa..." value={search} onChange={e => setSearch(e.target.value)} className="min-w-0" />
+              <Select value={filterProjeto} onValueChange={setFilterProjeto}>
+                <SelectTrigger className="min-w-0"><SelectValue placeholder="Projeto" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos os Projetos</SelectItem>
+                  {projetosUnicos.map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}
+                </SelectContent>
+              </Select>
+              <Select value={filterResponsavel} onValueChange={setFilterResponsavel}>
+                <SelectTrigger className="min-w-0"><SelectValue placeholder="Responsável" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos os Responsáveis</SelectItem>
+                  {responsaveis.map(r => <SelectItem key={r} value={r}>{r}</SelectItem>)}
+                </SelectContent>
+              </Select>
+              <Select value={filterStatus} onValueChange={setFilterStatus}>
+                <SelectTrigger className="min-w-0"><SelectValue placeholder="Status" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos os Status</SelectItem>
+                  {STATUS_OPTIONS.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
 
-        <div className="flex flex-wrap items-center gap-4">
-          <div className="flex items-center gap-2 min-w-[250px]">
-            <span className="text-xs text-muted-foreground whitespace-nowrap">% Conclusão:</span>
-            <Slider value={percentRange} onValueChange={setPercentRange} min={0} max={100} step={5} className="flex-1" />
-            <span className="text-xs text-muted-foreground whitespace-nowrap">{percentRange[0]}–{percentRange[1]}%</span>
-          </div>
-          <Button variant="outline" size="sm" onClick={expandAll} className="text-xs">Expandir Tudo</Button>
-          <Button variant="outline" size="sm" onClick={collapseAll} className="text-xs">Recolher Tudo</Button>
-          <div className="flex gap-2 ml-auto">
-            {canWrite && (
-              <Button size="sm" onClick={handleNewTask} className="gap-1.5">
-                <Plus size={14} /> Nova Tarefa
+            <div className="flex flex-wrap gap-2 xl:justify-end">
+              {canWrite && (
+                <Button size="sm" onClick={handleNewTask} className="min-w-[132px] gap-1.5 justify-center">
+                  <Plus size={14} /> Nova Tarefa
+                </Button>
+              )}
+              <Button variant="outline" size="sm" onClick={handleExportPdf} className="min-w-[86px] gap-1.5 justify-center">
+                <FileDown size={14} /> PDF
               </Button>
-            )}
-            <Button variant="outline" size="sm" onClick={handleExportPdf} className="gap-1.5">
-              <FileDown size={14} /> PDF
-            </Button>
-            <Button variant="outline" size="sm" onClick={handleExportExcel} className="gap-1.5">
-              <FileSpreadsheet size={14} /> Excel
-            </Button>
+              <Button variant="outline" size="sm" onClick={handleExportExcel} className="min-w-[92px] gap-1.5 justify-center">
+                <FileSpreadsheet size={14} /> Excel
+              </Button>
+            </div>
+          </div>
+
+          <div className="mt-4 flex flex-wrap items-center gap-4 border-t border-border/60 pt-4">
+            <div className="flex min-w-[260px] max-w-xl flex-1 items-center gap-2">
+              <span className="whitespace-nowrap text-xs text-muted-foreground">% Conclusão:</span>
+              <Slider value={percentRange} onValueChange={setPercentRange} min={0} max={100} step={5} className="min-w-0 flex-1" />
+              <span className="whitespace-nowrap text-xs text-muted-foreground">{percentRange[0]}–{percentRange[1]}%</span>
+            </div>
+            <Button variant="outline" size="sm" onClick={expandAll} className="text-xs">Expandir Tudo</Button>
+            <Button variant="outline" size="sm" onClick={collapseAll} className="text-xs">Recolher Tudo</Button>
+            <span className="text-xs text-muted-foreground">{filtered.length} tarefa(s) encontrada(s)</span>
           </div>
         </div>
 
-        <div className="text-xs text-muted-foreground">{filtered.length} tarefa(s) encontrada(s)</div>
-
-        <div className="rounded-lg border border-border overflow-auto bg-card">
-          <Table>
+        <div className="max-w-full rounded-lg border border-border bg-card">
+          <div className="overflow-x-auto">
+          <Table className="min-w-[1180px] table-fixed">
             <TableHeader>
               <TableRow className="bg-muted/50">
-                <TableHead className="w-24 text-xs cursor-pointer" onClick={() => toggleSort("id")}>
+                <TableHead className="w-[118px] text-xs cursor-pointer" onClick={() => toggleSort("id")}>
                   ID / WBS {sortBy === "id" && <ArrowUpDown size={12} className="inline ml-1" />}
                 </TableHead>
-                <TableHead className="text-xs cursor-pointer" onClick={() => toggleSort("projeto")}>
+                <TableHead className="w-[150px] text-xs cursor-pointer" onClick={() => toggleSort("projeto")}>
                   Projeto {sortBy === "projeto" && <ArrowUpDown size={12} className="inline ml-1" />}
                 </TableHead>
-                <TableHead className="text-xs min-w-[250px] cursor-pointer" onClick={() => toggleSort("tarefa")}>
+                <TableHead className="w-[270px] text-xs cursor-pointer" onClick={() => toggleSort("tarefa")}>
                   Tarefa {sortBy === "tarefa" && <ArrowUpDown size={12} className="inline ml-1" />}
                 </TableHead>
-                <TableHead className="text-xs">Recursos</TableHead>
-                <TableHead className="text-xs cursor-pointer" onClick={() => toggleSort("dataFimPlanej")}>
+                <TableHead className="w-[170px] text-xs">Recursos</TableHead>
+                <TableHead className="w-[96px] text-xs cursor-pointer" onClick={() => toggleSort("dataFimPlanej")}>
                   Fim Plan. {sortBy === "dataFimPlanej" && <ArrowUpDown size={12} className="inline ml-1" />}
                 </TableHead>
-                <TableHead className="text-xs">Pred.</TableHead>
-                <TableHead className="text-xs">Duração</TableHead>
-                <TableHead className="text-xs text-center cursor-pointer" onClick={() => toggleSort("percentual")}>
+                <TableHead className="w-[250px] text-xs">Pred.</TableHead>
+                <TableHead className="w-[82px] text-xs">Duração</TableHead>
+                <TableHead className="w-[64px] text-xs text-center cursor-pointer" onClick={() => toggleSort("percentual")}>
                   % {sortBy === "percentual" && <ArrowUpDown size={12} className="inline ml-1" />}
                 </TableHead>
-                <TableHead className="text-xs cursor-pointer" onClick={() => toggleSort("status")}>
+                <TableHead className="w-[126px] text-xs cursor-pointer" onClick={() => toggleSort("status")}>
                   Status {sortBy === "status" && <ArrowUpDown size={12} className="inline ml-1" />}
                 </TableHead>
-                {canWrite && <TableHead className="text-xs w-28">Ações</TableHead>}
+                {canWrite && <TableHead className="w-[96px] text-xs">Ações</TableHead>}
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -303,8 +308,8 @@ export default function TarefasPage() {
                 const firstBlocker = releaseState.blockers[0];
                 return (
                   <TableRow key={t.id} className={`hover:bg-muted/30 transition-colors ${t.depth > 0 ? 'bg-muted/10' : ''}`}>
-                    <TableCell className="text-xs font-mono text-muted-foreground">
-                      <div className="flex items-center gap-1" style={{ paddingLeft: `${t.depth * 16}px` }}>
+                    <TableCell className="align-top text-xs font-mono text-muted-foreground">
+                      <div className="flex items-center gap-1" style={{ paddingLeft: `${t.depth * 12}px` }}>
                         {hasChildren ? (
                           <button onClick={() => toggleExpand(t.id)} className="p-0.5 rounded hover:bg-muted">
                             {isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
@@ -312,13 +317,15 @@ export default function TarefasPage() {
                         ) : (
                           <span className="w-5" />
                         )}
-                        {getTaskBusinessId(t)}
+                        <span className="truncate">{getTaskBusinessId(t)}</span>
                       </div>
-                      <div className="pl-6 text-[10px] text-muted-foreground">WBS {getTaskDisplayHierarchy(t)} · Chave {t.id}</div>
+                      <div className="pl-6 text-[10px] text-muted-foreground">WBS {getTaskDisplayHierarchy(t)}</div>
                     </TableCell>
-                    <TableCell className="text-xs font-medium">{t.depth === 0 ? t.projeto : ""}</TableCell>
-                    <TableCell className="text-xs">
-                      <div style={{ paddingLeft: `${t.depth * 12}px` }}>
+                    <TableCell className="align-top text-xs font-medium">
+                      <span className="line-clamp-2 break-words">{t.depth === 0 ? t.projeto : ""}</span>
+                    </TableCell>
+                    <TableCell className="align-top text-xs">
+                      <div className="break-words" style={{ paddingLeft: `${t.depth * 10}px` }}>
                         {t.depth > 0 && <span className="text-muted-foreground mr-1">↳</span>}
                         {t.tarefa}
                         {hasChildren && (
@@ -326,10 +333,12 @@ export default function TarefasPage() {
                         )}
                       </div>
                     </TableCell>
-                    <TableCell className="text-xs text-muted-foreground">{getTaskResourceLabel(t) || "—"}</TableCell>
-                    <TableCell className="text-xs text-muted-foreground">{t.dataFimPlanej}</TableCell>
-                    <TableCell className="max-w-64 text-xs text-muted-foreground">
-                      <div>{getTaskPredecessorLabel(t) || "—"}</div>
+                    <TableCell className="align-top text-xs text-muted-foreground">
+                      <span className="line-clamp-3 break-words">{getTaskResourceLabel(t) || "—"}</span>
+                    </TableCell>
+                    <TableCell className="align-top text-xs text-muted-foreground">{t.dataFimPlanej}</TableCell>
+                    <TableCell className="align-top text-xs text-muted-foreground">
+                      <div className="break-words">{getTaskPredecessorLabel(t) || "—"}</div>
                       {releaseState.isBlocked ? (
                         <div className="mt-1 rounded-md border border-destructive/25 bg-destructive/10 px-2 py-1 text-[11px] leading-snug text-destructive">
                           Bloqueada por {firstBlocker?.label || "predecessora pendente"}
@@ -339,11 +348,11 @@ export default function TarefasPage() {
                         <div className="mt-1 text-[11px] text-success">Liberada</div>
                       ) : null}
                     </TableCell>
-                    <TableCell className="text-xs text-muted-foreground">{formatDurationHours(t.durationMinutes || 0)}</TableCell>
-                    <TableCell className="text-xs text-center font-medium">{t.percentual}%</TableCell>
-                    <TableCell><StatusDot status={t.status} /></TableCell>
+                    <TableCell className="align-top text-xs text-muted-foreground">{formatDurationHours(t.durationMinutes || 0)}</TableCell>
+                    <TableCell className="align-top text-center text-xs font-medium">{t.percentual}%</TableCell>
+                    <TableCell className="align-top"><StatusDot status={t.status} /></TableCell>
                     {canWrite && (
-                      <TableCell>
+                      <TableCell className="align-top">
                         <div className="flex gap-0.5">
                           {canAddSubtask(t) && (
                             <Button variant="ghost" size="icon" className="h-7 w-7 text-primary" title="Adicionar subtarefa" onClick={() => handleAddSubtask(t)}>
@@ -364,6 +373,7 @@ export default function TarefasPage() {
               })}
             </TableBody>
           </Table>
+          </div>
         </div>
       </div>
 
