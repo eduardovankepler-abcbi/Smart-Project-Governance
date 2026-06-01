@@ -10,6 +10,7 @@ import { AlertTriangle, CalendarRange, CheckCircle2, Gauge, Users } from "lucide
 import { ResponsiveContainer, BarChart, Bar, CartesianGrid, XAxis, YAxis, Tooltip } from "recharts";
 import { findProjectForTask, getTaskResourceNames } from "@/utils/projectModel";
 import { normalizeMaxUnits } from "@/utils/resourceCapacity";
+import { calculateBusinessDayOverlapFactor, countWorkingDays, type CapacityPeriod } from "@/utils/capacityPlanning";
 import ChartPreviewModal from "@/components/ChartPreviewModal";
 
 interface CapacityAssignment {
@@ -48,11 +49,6 @@ interface CapacityRow {
 }
 
 type PeriodPreset = "current-month" | "next-month" | "quarter" | "all" | "custom";
-
-interface CapacityPeriod {
-  start: Date | null;
-  end: Date | null;
-}
 
 const HOURS_PER_WORKDAY = 8;
 
@@ -124,35 +120,6 @@ function getPeriodFromPreset(preset: PeriodPreset, customStart: string, customEn
   return { start: startOfMonth(today), end: endOfMonth(today) };
 }
 
-function calculateOverlapFactor(startDate: Date | null, finishDate: Date | null, period: CapacityPeriod) {
-  if (!period.start || !period.end) return 1;
-  if (!startDate && !finishDate) return 0;
-  const taskStart = startDate || finishDate;
-  const taskEnd = finishDate || startDate;
-  if (!taskStart || !taskEnd) return 0;
-  const normalizedTaskStart = new Date(taskStart.getFullYear(), taskStart.getMonth(), taskStart.getDate());
-  const normalizedTaskEnd = new Date(taskEnd.getFullYear(), taskEnd.getMonth(), taskEnd.getDate());
-  const overlapStart = new Date(Math.max(normalizedTaskStart.getTime(), period.start.getTime()));
-  const overlapEnd = new Date(Math.min(normalizedTaskEnd.getTime(), period.end.getTime()));
-  if (overlapEnd.getTime() < overlapStart.getTime()) return 0;
-  const dayMs = 24 * 60 * 60 * 1000;
-  const totalDays = Math.max(Math.round((normalizedTaskEnd.getTime() - normalizedTaskStart.getTime()) / dayMs) + 1, 1);
-  const overlapDays = Math.max(Math.round((overlapEnd.getTime() - overlapStart.getTime()) / dayMs) + 1, 0);
-  return Math.min(overlapDays / totalDays, 1);
-}
-
-function countWorkingDays(start: Date | null, end: Date | null) {
-  if (!start || !end) return 0;
-  const first = new Date(Math.min(start.getTime(), end.getTime()));
-  const last = new Date(Math.max(start.getTime(), end.getTime()));
-  let days = 0;
-  for (let cursor = new Date(first); cursor.getTime() <= last.getTime(); cursor.setDate(cursor.getDate() + 1)) {
-    const day = cursor.getDay();
-    if (day !== 0 && day !== 6) days += 1;
-  }
-  return days;
-}
-
 function getCapacityWindow(assignments: CapacityAssignment[], period: CapacityPeriod): CapacityPeriod {
   if (period.start && period.end) return period;
   const dates = assignments
@@ -218,7 +185,7 @@ export default function CapacidadePage() {
 
     const normalizedAssignments: CapacityAssignment[] = tarefas.flatMap((task) => {
       const { startDate, finishDate } = getTaskDateRange(task);
-      const overlapFactor = calculateOverlapFactor(startDate, finishDate, selectedPeriod);
+      const overlapFactor = calculateBusinessDayOverlapFactor(startDate, finishDate, selectedPeriod);
       if (overlapFactor <= 0) return [];
 
       if (task.assignments?.length) {
