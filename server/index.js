@@ -267,8 +267,8 @@ async function upsertScheduleProject(conn, { projectName, fileName, rootRow, edr
   }
 
   const [insertProject] = await conn.query(
-    `INSERT INTO projetos (project_code, business_unit_id, business_unit_nome, projeto, descricao, prioridade, responsavel, ftes, valor_previsto, valor_gasto, data_inicio_planej, data_inicio_planej_date, data_fim_planej, data_fim_planej_date, data_inicio, data_inicio_real_date, data_fim_real, data_fim_real_date, total_tarefas, tarefas_concluidas, tarefas_andamento, tarefas_atrasadas, tarefas_nao_iniciadas, status, conclusao)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO projetos (project_code, business_unit_id, business_unit_nome, projeto, descricao, prioridade, responsavel, ftes, valor_previsto, orcamento_aprovado, valor_gasto, data_inicio_planej, data_inicio_planej_date, data_fim_planej, data_fim_planej_date, data_inicio, data_inicio_real_date, data_fim_real, data_fim_real_date, total_tarefas, tarefas_concluidas, tarefas_andamento, tarefas_atrasadas, tarefas_nao_iniciadas, status, conclusao)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       buildProjectCode("", projectName),
       1,
@@ -278,6 +278,7 @@ async function upsertScheduleProject(conn, { projectName, fileName, rootRow, edr
       "2- Média",
       sanitizeString(col(rootRow, "Resources", "Recursos"), 200),
       recursos.size,
+      0,
       0,
       0,
       dataInicioPlanej,
@@ -674,9 +675,11 @@ app.post("/api/import-excel", requireAuth, requireImportAccess, upload.single("f
           const dataFimPlanej = parseExcelDate(col(r, "Data Fim Planejado", "data_fim_planej"));
           const dataInicioReal = parseExcelDate(col(r, "Data Início", "data_inicio"));
           const dataFimReal = sanitizeString(col(r, "Data Fim Real", "data_fim_real"), 50);
+          const valorPrevisto = sanitizeNumber(col(r, "Valor Previsto", "valor_previsto", "Custo Planejado", "custo_planejado"));
+          const orcamentoAprovado = sanitizeNumber(col(r, "Orçamento Aprovado", "Orcamento Aprovado", "orcamento_aprovado"), valorPrevisto);
           await conn.query(
-            `INSERT INTO projetos (id, project_code, business_unit_id, business_unit_nome, projeto, descricao, prioridade, responsavel, ftes, valor_previsto, valor_gasto, data_inicio_planej, data_inicio_planej_date, data_fim_planej, data_fim_planej_date, data_inicio, data_inicio_real_date, data_fim_real, data_fim_real_date, total_tarefas, tarefas_concluidas, tarefas_andamento, tarefas_atrasadas, tarefas_nao_iniciadas, status, conclusao)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            `INSERT INTO projetos (id, project_code, business_unit_id, business_unit_nome, projeto, descricao, prioridade, responsavel, ftes, valor_previsto, orcamento_aprovado, valor_gasto, data_inicio_planej, data_inicio_planej_date, data_fim_planej, data_fim_planej_date, data_inicio, data_inicio_real_date, data_fim_real, data_fim_real_date, total_tarefas, tarefas_concluidas, tarefas_andamento, tarefas_atrasadas, tarefas_nao_iniciadas, status, conclusao)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
             [
               sanitizeInt(col(r, "ID", "id")),
               buildProjectCode(col(r, "Project ID", "projectId", "project_code"), col(r, "Projeto", "projeto")),
@@ -687,7 +690,8 @@ app.post("/api/import-excel", requireAuth, requireImportAccess, upload.single("f
               sanitizeString(col(r, "Prioridade", "prioridade"), 50),
               sanitizeString(col(r, "Responsável", "responsavel", "Responsavel"), 200),
               sanitizeNumber(col(r, "FTEs", "ftes")),
-              sanitizeNumber(col(r, "Valor Previsto", "valor_previsto")),
+              valorPrevisto,
+              orcamentoAprovado,
               sanitizeNumber(col(r, "Valor Gasto", "valor_gasto")),
               dataInicioPlanej,
               normalizeDateInput(dataInicioPlanej) || null,
@@ -1071,9 +1075,9 @@ app.post("/api/import-ms-project", requireAuth, requireImportAccess, uploadMsPro
       } else {
         const [insert] = await conn.query(
           `INSERT INTO projetos
-            (project_code, business_unit_id, business_unit_nome, projeto, descricao, prioridade, responsavel, ftes, valor_previsto, valor_gasto, data_inicio_planej, data_inicio_planej_date, data_fim_planej, data_fim_planej_date, data_inicio, data_inicio_real_date, data_fim_real, data_fim_real_date,
+            (project_code, business_unit_id, business_unit_nome, projeto, descricao, prioridade, responsavel, ftes, valor_previsto, orcamento_aprovado, valor_gasto, data_inicio_planej, data_inicio_planej_date, data_fim_planej, data_fim_planej_date, data_inicio, data_inicio_real_date, data_fim_real, data_fim_real_date,
              total_tarefas, tarefas_concluidas, tarefas_andamento, tarefas_atrasadas, tarefas_nao_iniciadas, status, conclusao)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '', NULL, '', NULL, 0, 0, 0, 0, 0, ?, ?)`,
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '', NULL, '', NULL, 0, 0, 0, 0, 0, ?, ?)`,
           [
             buildProjectCode(parsed.project.projectId, parsed.project.projeto),
             1,
@@ -1084,6 +1088,7 @@ app.post("/api/import-ms-project", requireAuth, requireImportAccess, uploadMsPro
             parsed.project.responsavel,
             parsed.project.ftes,
             parsed.project.valorPrevisto,
+            parsed.project.orcamentoAprovado ?? parsed.project.valorPrevisto,
             parsed.project.valorGasto,
             parsed.project.dataInicioPlanej,
             normalizeDateInput(parsed.project.dataInicioPlanej) || null,

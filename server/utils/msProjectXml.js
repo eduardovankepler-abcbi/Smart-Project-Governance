@@ -209,6 +209,7 @@ function parseMsProjectXml(xmlContent) {
       responsavel: "",
       ftes: 0,
       valorPrevisto: normalizedTasks.reduce((sum, task) => sum + Number(task.valorPrevisto || 0), 0),
+      orcamentoAprovado: normalizedTasks.reduce((sum, task) => sum + Number(task.valorPrevisto || 0), 0),
       valorGasto: normalizedTasks.reduce((sum, task) => sum + Number(task.valorGasto || 0), 0),
       dataInicioPlanej: normalizedTasks.map((task) => task.dataInicioPlanej).find(Boolean) || "",
       dataFimPlanej: [...normalizedTasks].reverse().map((task) => task.dataFimPlanej).find(Boolean) || "",

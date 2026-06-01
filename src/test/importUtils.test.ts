@@ -58,6 +58,29 @@ describe("parseExcelFile", () => {
     });
   });
 
+  it("imports approved budget from project sheets with planned-cost fallback", async () => {
+    const workbook = new ExcelJS.Workbook();
+    const sheet = workbook.addWorksheet("Projetos");
+    sheet.addRow(["ID", "Projeto", "Valor Previsto", "Orçamento Aprovado", "Valor Gasto", "Status", "% Conclusão"]);
+    sheet.addRow([1, "Projeto Financeiro", 1500, 2000, 300, "Em andamento", 25]);
+    sheet.addRow([2, "Projeto Sem Orcamento", 800, "", 100, "Não iniciado", 0]);
+
+    const result = await parseExcelFile(await workbookToFile(workbook, "projetos.xlsx"));
+
+    expect(result.counts.projetos).toBe(2);
+    expect(result.projetos?.[0]).toMatchObject({
+      projeto: "Projeto Financeiro",
+      valorPrevisto: 1500,
+      orcamentoAprovado: 2000,
+      valorGasto: 300,
+    });
+    expect(result.projetos?.[1]).toMatchObject({
+      projeto: "Projeto Sem Orcamento",
+      valorPrevisto: 800,
+      orcamentoAprovado: 800,
+    });
+  });
+
   it("imports EdrawProj exports with schedule on Sheet1 and headers on row 2", async () => {
     const workbook = new ExcelJS.Workbook();
     const schedule = workbook.addWorksheet("Sheet1");

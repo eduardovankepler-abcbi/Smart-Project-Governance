@@ -1,4 +1,4 @@
-const { normalizeDateInput, sanitizeString, sanitizeInt } = require("./parsing");
+const { normalizeDateInput, sanitizeString, sanitizeInt, sanitizeNumber } = require("./parsing");
 const { buildNormalizedScheduleFromProjectSnapshot } = require("./scheduleNormalization");
 
 const TEMPLATE_SOURCE_TYPES = {
@@ -253,13 +253,15 @@ async function instantiateProjectFromTemplate(pool, payload) {
     produtoNome = produtoRows[0].nome;
   }
 
+  const templatePlannedCost = templateBundle.tasks.reduce((sum, task) => sum + Number(task.valor_previsto || 0), 0);
+
   const conn = await pool.getConnection();
   try {
     await conn.beginTransaction();
     const [projectInsert] = await conn.query(
       `INSERT INTO projetos
-        (project_code, project_type, business_unit_id, business_unit_nome, produto_id, produto_nome, projeto, descricao, prioridade, responsavel, ftes, valor_previsto, valor_gasto, data_inicio_planej, data_inicio_planej_date, data_fim_planej, data_fim_planej_date, data_inicio, data_inicio_real_date, data_fim_real, data_fim_real_date, total_tarefas, tarefas_concluidas, tarefas_andamento, tarefas_atrasadas, tarefas_nao_iniciadas, status, conclusao)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        (project_code, project_type, business_unit_id, business_unit_nome, produto_id, produto_nome, projeto, descricao, prioridade, responsavel, ftes, valor_previsto, orcamento_aprovado, valor_gasto, data_inicio_planej, data_inicio_planej_date, data_fim_planej, data_fim_planej_date, data_inicio, data_inicio_real_date, data_fim_real, data_fim_real_date, total_tarefas, tarefas_concluidas, tarefas_andamento, tarefas_atrasadas, tarefas_nao_iniciadas, status, conclusao)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         projectCode,
         sanitizeString(payload.projectType, 30) || metadata.projectType || "Projeto",
@@ -272,7 +274,8 @@ async function instantiateProjectFromTemplate(pool, payload) {
         sanitizeString(payload.prioridade, 50) || "2- Média",
         sanitizeString(payload.responsavel, 120) || "",
         0,
-        0,
+        templatePlannedCost,
+        sanitizeNumber(payload.orcamentoAprovado, templatePlannedCost),
         0,
         "",
         null,

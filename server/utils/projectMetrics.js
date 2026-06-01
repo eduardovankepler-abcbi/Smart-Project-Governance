@@ -97,12 +97,13 @@ async function syncProjectMetrics(pool, projeto) {
 
   const [insert] = await pool.query(
     `INSERT INTO projetos
-      (project_code, projeto, descricao, prioridade, responsavel, ftes, valor_previsto, valor_gasto, data_inicio_planej, data_inicio_planej_date, data_fim_planej, data_fim_planej_date, data_inicio, data_fim_real,
+      (project_code, projeto, descricao, prioridade, responsavel, ftes, valor_previsto, orcamento_aprovado, valor_gasto, data_inicio_planej, data_inicio_planej_date, data_fim_planej, data_fim_planej_date, data_inicio, data_fim_real,
        total_tarefas, tarefas_concluidas, tarefas_andamento, tarefas_atrasadas, tarefas_nao_iniciadas, status, conclusao)
-     VALUES (?, ?, '', '2- Média', '', 0, ?, ?, ?, ?, ?, ?, '', '', ?, ?, ?, ?, ?, ?, ?)`,
+     VALUES (?, ?, '', '2- Média', '', 0, ?, ?, ?, ?, ?, ?, ?, '', '', ?, ?, ?, ?, ?, ?, ?)`,
     [
       buildProjectCode(projeto),
       projeto,
+      valorPrevisto,
       valorPrevisto,
       valorGasto,
       plannedStartText,

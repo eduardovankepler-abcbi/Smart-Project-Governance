@@ -77,6 +77,7 @@ function buildNormalizedScheduleFromProjectSnapshot(project, tasks = []) {
       responsavel: String(project.responsavel || ""),
       ftes: Number(project.ftes || 0),
       valorPrevisto: Number(project.valor_previsto || 0),
+      orcamentoAprovado: Number(project.orcamento_aprovado || project.valor_previsto || 0),
       valorGasto: Number(project.valor_gasto || 0),
       dataInicioPlanej: String(project.data_inicio_planej || ""),
       dataFimPlanej: String(project.data_fim_planej || ""),
