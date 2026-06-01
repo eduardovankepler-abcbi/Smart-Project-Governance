@@ -53,7 +53,7 @@ export default function NotificationBell() {
           projeto: t.projeto,
           message: `Tarefa atrasada desde ${t.dataFimPlanej || "N/A"}`,
         });
-      } else if (t.status !== "Concluído") {
+      } else if (t.status !== "Concluído" && t.status !== "Congelado") {
         const fim = parseDate(t.dataFimPlanej);
         if (fim) {
           const diffDays = Math.ceil((fim.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));

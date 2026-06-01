@@ -25,6 +25,7 @@ const STATUS_COLORS: Record<string, string> = {
   "Atrasado": "bg-destructive",
   "Em andamento": "bg-warning",
   "Não iniciado": "bg-muted-foreground/40",
+  "Congelado": "bg-info",
   "Concluído": "bg-success",
 };
 

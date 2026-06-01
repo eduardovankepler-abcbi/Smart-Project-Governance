@@ -9,6 +9,17 @@ test("deriveTaskStatus marks completed tasks by progress or real finish", () => 
   assert.equal(deriveTaskStatus({ percentual: 20, dataFimReal: "2026-05-20" }, { today: TODAY }), TASK_STATUSES.DONE);
 });
 
+test("deriveTaskStatus preserves explicit frozen tasks", () => {
+  assert.equal(
+    deriveTaskStatus({ status: "Freezing", percentual: 100, dataFimReal: "2026-05-20" }, { today: TODAY }),
+    TASK_STATUSES.FROZEN
+  );
+  assert.equal(
+    deriveTaskStatus({ status: "Congelado", dataFimPlanej: "2026-05-01" }, { today: TODAY }),
+    TASK_STATUSES.FROZEN
+  );
+});
+
 test("deriveTaskStatus marks unfinished overdue tasks as late", () => {
   assert.equal(
     deriveTaskStatus({ percentual: 90, dataFimPlanej: "2026-05-26" }, { today: TODAY }),
@@ -29,6 +40,13 @@ test("deriveTaskStatus derives in-progress and not-started states", () => {
 
 test("deriveProjectStatus summarizes task statuses by management severity", () => {
   assert.equal(deriveProjectStatus([{ status: "Concluído", percentual: 100 }]), TASK_STATUSES.DONE);
+  assert.equal(
+    deriveProjectStatus([
+      { status: "Congelado" },
+      { percentual: 20, dataFimPlanej: "2026-05-26" },
+    ]),
+    TASK_STATUSES.FROZEN
+  );
   assert.equal(
     deriveProjectStatus([
       { status: "Concluído", percentual: 100 },

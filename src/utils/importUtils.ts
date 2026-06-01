@@ -238,6 +238,7 @@ function parseDurationHours(value: unknown): number {
 function mapScheduleStatus(value: unknown, progress = 0): string {
   const raw = normalize(str(value, 50));
   if (raw.includes("complete") || raw.includes("concluido")) return "Concluído";
+  if (raw.includes("freeze") || raw.includes("freezing") || raw.includes("frozen") || raw.includes("congel")) return "Congelado";
   if (raw.includes("delay") || raw.includes("atras")) return "Atrasado";
   if (raw.includes("not started") || raw.includes("nao iniciado")) return "Não iniciado";
   if (raw.includes("progress") || raw.includes("andamento")) return "Em andamento";
@@ -431,7 +432,7 @@ export async function parseExcelFile(file: File): Promise<ImportResult> {
       tarefasAndamento: int(col(r, "Tarefas em Andamento", "tarefas_andamento")),
       tarefasAtrasadas: int(col(r, "Tarefas Atrasadas", "tarefas_atrasadas")),
       tarefasNaoIniciadas: int(col(r, "Tarefas Não Iniciadas", "tarefas_nao_iniciadas")),
-      status: str(col(r, "Status", "status"), 50),
+      status: mapScheduleStatus(col(r, "Status", "status"), num(col(r, "% Conclusão", "conclusao"))),
       conclusao: num(col(r, "% Conclusão", "conclusao")),
     }));
     result.counts.projetos = result.projetos.length;
@@ -456,7 +457,7 @@ export async function parseExcelFile(file: File): Promise<ImportResult> {
       esforcoReal: num(col(r, "Esforço Real", "esforco_real")),
       dataFimReal: str(col(r, "Data Fim Real", "data_fim_real"), 20),
       percentual: num(col(r, "% Concluído", "percentual")),
-      status: str(col(r, "Status", "status"), 50),
+      status: mapScheduleStatus(col(r, "Status", "status"), num(col(r, "% Concluído", "percentual"))),
       valorPrevisto: num(col(r, "Valor Previsto", "valor_previsto")),
       valorGasto: num(col(r, "Valor Gasto", "valor_gasto")),
       diasPlanejados: int(col(r, "Dias Planejados", "dias_planejados")),

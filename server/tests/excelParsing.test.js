@@ -71,3 +71,8 @@ test("EdrawProj schedule sheets are detected and normalized", () => {
   assert.equal(parseDurationHours(col(rows[1], "Duration")), 16);
   assert.equal(mapScheduleStatus(col(rows[1], "Status"), sanitizeNumber(col(rows[1], "Progress"))), "Concluído");
 });
+
+test("mapScheduleStatus preserves frozen schedule status", () => {
+  assert.equal(mapScheduleStatus("Freezing", 100), "Congelado");
+  assert.equal(mapScheduleStatus("Congelado", 0), "Congelado");
+});

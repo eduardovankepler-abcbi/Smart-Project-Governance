@@ -25,7 +25,7 @@ function buildProjectCode(projeto) {
 async function syncProjectMetrics(pool, projeto) {
   if (!projeto) return;
 
-  const [existing] = await pool.query("SELECT id FROM projetos WHERE projeto = ? LIMIT 1", [projeto]);
+  const [existing] = await pool.query("SELECT id, status FROM projetos WHERE projeto = ? LIMIT 1", [projeto]);
   const projectId = existing[0]?.id || null;
   const [taskRows] = await pool.query(
     "SELECT * FROM tarefas WHERE projeto_id = ? OR projeto = ? ORDER BY sort_order, id",
@@ -53,7 +53,9 @@ async function syncProjectMetrics(pool, projeto) {
     : 0;
   const valorPrevisto = taskRows.reduce((sum, task) => sum + Number(task.valor_previsto || 0), 0);
   const valorGasto = taskRows.reduce((sum, task) => sum + Number(task.valor_gasto || 0), 0);
-  const projectStatus = deriveProjectStatus(tasksWithDerivedStatus);
+  const projectStatus = existing[0]?.status === TASK_STATUSES.FROZEN
+    ? TASK_STATUSES.FROZEN
+    : deriveProjectStatus(tasksWithDerivedStatus);
 
   const starts = taskRows
     .map((task) => parseDateValue(task.data_inicio_planej_date || task.data_inicio_planej))

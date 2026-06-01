@@ -16,7 +16,7 @@ interface ProjetoDialogProps {
   projeto?: Projeto | null;
 }
 
-const STATUS_OPTIONS = ["Atrasado", "Em andamento", "Não iniciado", "Concluído"];
+const STATUS_OPTIONS = ["Atrasado", "Em andamento", "Não iniciado", "Congelado", "Concluído"];
 const PRIORIDADE_OPTIONS = ["1- Alta", "2- Média", "3- Baixa"];
 const PROJECT_TYPE_OPTIONS = ["Tac", "CR", "Projeto", "Pré-Venda"];
 

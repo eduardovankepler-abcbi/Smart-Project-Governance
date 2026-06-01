@@ -81,6 +81,21 @@ describe("parseExcelFile", () => {
     });
   });
 
+  it("normalizes frozen schedule statuses", async () => {
+    const workbook = new ExcelJS.Workbook();
+    const sheet = workbook.addWorksheet("Tarefas");
+    sheet.addRow(["ID", "Projeto", "Tarefa", "Data Início Planejado", "Data Fim Planejado", "% Concluído", "Status"]);
+    sheet.addRow(["1.1", "Projeto Congelado", "Aguardar cliente", "2026-06-01", "2026-06-03", 100, "Freezing"]);
+
+    const result = await parseExcelFile(await workbookToFile(workbook, "cronograma-freeze.xlsx"));
+
+    expect(result.tarefas?.[0]).toMatchObject({
+      tarefa: "Aguardar cliente",
+      percentual: 100,
+      status: "Congelado",
+    });
+  });
+
   it("imports EdrawProj exports with schedule on Sheet1 and headers on row 2", async () => {
     const workbook = new ExcelJS.Workbook();
     const schedule = workbook.addWorksheet("Sheet1");

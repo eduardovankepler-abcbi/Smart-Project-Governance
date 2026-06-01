@@ -285,6 +285,7 @@ export function getStatusColor(status: string): string {
     case "Atrasado": return "destructive";
     case "Em andamento": return "warning";
     case "Não iniciado": return "secondary";
+    case "Congelado": return "info";
     case "Concluído": return "success";
     default: return "secondary";
   }

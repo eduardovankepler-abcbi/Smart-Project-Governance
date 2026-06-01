@@ -34,7 +34,7 @@ interface TarefaDialogProps {
   mode?: "task" | "subtask";
 }
 
-const STATUS_OPTIONS = ["Atrasado", "Em andamento", "Não iniciado", "Concluído"];
+const STATUS_OPTIONS = ["Atrasado", "Em andamento", "Não iniciado", "Congelado", "Concluído"];
 const TASK_TYPE_OPTIONS = [
   { value: "fixed_units", label: "Unidades Fixas" },
   { value: "fixed_duration", label: "Duração Fixa" },

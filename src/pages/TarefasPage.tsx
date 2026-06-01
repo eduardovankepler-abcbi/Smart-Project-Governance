@@ -24,6 +24,7 @@ function StatusDot({ status }: { status: string }) {
     destructive: "bg-destructive",
     warning: "bg-warning",
     success: "bg-success",
+    info: "bg-info",
     secondary: "bg-muted-foreground",
   };
   return (
@@ -34,7 +35,7 @@ function StatusDot({ status }: { status: string }) {
   );
 }
 
-const STATUS_OPTIONS = ["Atrasado", "Em andamento", "Não iniciado", "Concluído"];
+const STATUS_OPTIONS = ["Atrasado", "Em andamento", "Não iniciado", "Congelado", "Concluído"];
 type SortKey = "id" | "projeto" | "tarefa" | "dataFimPlanej" | "percentual" | "status";
 
 interface TreeNode extends Tarefa {

@@ -80,6 +80,8 @@ function parseDurationHours(value) {
 }
 
 function mapScheduleStatus(value, progress = 0) {
+  const raw = normalizeColName(sanitizeString(value, 50));
+  if (raw.includes("freeze") || raw.includes("freezing") || raw.includes("frozen") || raw.includes("congel")) return "Congelado";
   if (progress >= 100) return "Concluído";
   if (progress > 0) return "Em andamento";
   return "Não iniciado";
