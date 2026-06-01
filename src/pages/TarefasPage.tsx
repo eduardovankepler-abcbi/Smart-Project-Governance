@@ -15,7 +15,7 @@ import { isApiEnabled } from "@/config/api";
 import TarefaDialog from "@/components/TarefaDialog";
 import DeleteDialog from "@/components/DeleteDialog";
 import type { Tarefa } from "@/data/projectData";
-import { formatDurationHours, getProjectTasksByName, getTaskPredecessorLabel, getTaskResourceLabel, getTaskResourceNames } from "@/utils/projectModel";
+import { formatDurationHours, getProjectTasksByName, getTaskPredecessorLabel, getTaskReleaseState, getTaskResourceLabel, getTaskResourceNames } from "@/utils/projectModel";
 import { getTaskBusinessId, getTaskDisplayHierarchy, MAX_TASK_WBS_DEPTH } from "@/utils/taskIdentity";
 
 function StatusDot({ status }: { status: string }) {
@@ -299,6 +299,8 @@ export default function TarefasPage() {
               {visibleRows.map(t => {
                 const hasChildren = t.children.length > 0;
                 const isExpanded = expanded.has(t.id);
+                const releaseState = getTaskReleaseState(t, tarefas, projetos);
+                const firstBlocker = releaseState.blockers[0];
                 return (
                   <TableRow key={t.id} className={`hover:bg-muted/30 transition-colors ${t.depth > 0 ? 'bg-muted/10' : ''}`}>
                     <TableCell className="text-xs font-mono text-muted-foreground">
@@ -326,7 +328,17 @@ export default function TarefasPage() {
                     </TableCell>
                     <TableCell className="text-xs text-muted-foreground">{getTaskResourceLabel(t) || "—"}</TableCell>
                     <TableCell className="text-xs text-muted-foreground">{t.dataFimPlanej}</TableCell>
-                    <TableCell className="text-xs text-muted-foreground">{getTaskPredecessorLabel(t) || "—"}</TableCell>
+                    <TableCell className="max-w-64 text-xs text-muted-foreground">
+                      <div>{getTaskPredecessorLabel(t) || "—"}</div>
+                      {releaseState.isBlocked ? (
+                        <div className="mt-1 rounded-md border border-destructive/25 bg-destructive/10 px-2 py-1 text-[11px] leading-snug text-destructive">
+                          Bloqueada por {firstBlocker?.label || "predecessora pendente"}
+                          {releaseState.blockers.length > 1 ? ` +${releaseState.blockers.length - 1}` : ""}
+                        </div>
+                      ) : releaseState.status === "released" ? (
+                        <div className="mt-1 text-[11px] text-success">Liberada</div>
+                      ) : null}
+                    </TableCell>
                     <TableCell className="text-xs text-muted-foreground">{formatDurationHours(t.durationMinutes || 0)}</TableCell>
                     <TableCell className="text-xs text-center font-medium">{t.percentual}%</TableCell>
                     <TableCell><StatusDot status={t.status} /></TableCell>

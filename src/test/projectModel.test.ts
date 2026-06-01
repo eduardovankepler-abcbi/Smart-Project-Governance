@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { getTasksForProject, isTaskLinkedToProject } from "@/utils/projectModel";
+import { getProjectFlowBlockers, getTaskReleaseState, getTasksForProject, isTaskLinkedToProject } from "@/utils/projectModel";
 import type { Projeto, Tarefa } from "@/data/projectData";
 
 const baseProject: Projeto = {
@@ -65,5 +65,82 @@ describe("projectModel task/project linkage", () => {
     ];
 
     expect(getTasksForProject(tasks, baseProject).map((item) => item.id)).toEqual(["a", "c"]);
+  });
+});
+
+describe("projectModel dependency release state", () => {
+  it("marks tasks without predecessors and tasks with completed predecessors as released", () => {
+    const tasks = [
+      task({ id: "p-1", externalId: "2.1", wbs: "2.1", tarefa: "Preparar base", status: "Concluído", percentual: 100 }),
+      task({
+        id: "p-2",
+        externalId: "2.2",
+        wbs: "2.2",
+        tarefa: "Executar etapa",
+        predecessors: [{ predecessorTaskId: "p-1", type: "FS", lagMinutes: 0 }],
+      }),
+    ];
+
+    expect(getTaskReleaseState(tasks[0], tasks, [baseProject])).toMatchObject({
+      status: "no_predecessors",
+      isReleased: true,
+      isBlocked: false,
+    });
+    expect(getTaskReleaseState(tasks[1], tasks, [baseProject])).toMatchObject({
+      status: "released",
+      isReleased: true,
+      isBlocked: false,
+      predecessorCount: 1,
+    });
+  });
+
+  it("reports the predecessor keeping a task blocked", () => {
+    const tasks = [
+      task({ id: "p-1", externalId: "2.1", wbs: "2.1", tarefa: "Validar requisitos", status: "Em andamento", percentual: 80 }),
+      task({
+        id: "p-2",
+        externalId: "2.2",
+        wbs: "2.2",
+        sortOrder: 2,
+        tarefa: "Iniciar desenvolvimento",
+        predecessors: [{ predecessorTaskId: "2.1", type: "FS", lagMinutes: 0 }],
+      }),
+    ];
+
+    const releaseState = getTaskReleaseState(tasks[1], tasks, [baseProject]);
+
+    expect(releaseState).toMatchObject({
+      status: "blocked",
+      isReleased: false,
+      isBlocked: true,
+      predecessorCount: 1,
+    });
+    expect(releaseState.blockers[0]).toMatchObject({
+      predecessorTaskId: "2.1",
+      dependencyType: "FS",
+      status: "Em andamento",
+      missing: false,
+    });
+    expect(releaseState.blockers[0].label).toContain("Validar requisitos");
+    expect(getProjectFlowBlockers(tasks, baseProject, [baseProject]).map((item) => item.task.id)).toEqual(["p-2"]);
+  });
+
+  it("treats missing predecessors as blockers", () => {
+    const blocked = task({
+      id: "p-3",
+      externalId: "2.3",
+      wbs: "2.3",
+      tarefa: "Homologar",
+      predecessors: [{ predecessorTaskId: "2.99", type: "FS", lagMinutes: 0 }],
+    });
+
+    const releaseState = getTaskReleaseState(blocked, [blocked], [baseProject]);
+
+    expect(releaseState.status).toBe("blocked");
+    expect(releaseState.blockers[0]).toMatchObject({
+      predecessorTaskId: "2.99",
+      status: "Não encontrada",
+      missing: true,
+    });
   });
 });

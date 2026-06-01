@@ -1,5 +1,22 @@
 import type { Projeto, Tarefa } from "@/data/projectData";
 
+export interface TaskReleaseBlocker {
+  predecessorTaskId: string;
+  dependencyType: string;
+  task?: Tarefa;
+  label: string;
+  status: string;
+  missing: boolean;
+}
+
+export interface TaskReleaseState {
+  status: "no_predecessors" | "released" | "blocked";
+  isReleased: boolean;
+  isBlocked: boolean;
+  blockers: TaskReleaseBlocker[];
+  predecessorCount: number;
+}
+
 export function splitNames(value: string): string[] {
   return String(value || "")
     .split(";")
@@ -59,4 +76,87 @@ export function getProjectTasksByName(tasks: Tarefa[], projects: Projeto[], proj
   const project = projects.find((item) => item.projeto === projectName);
   if (!project) return tasks.filter((task) => task.projeto === projectName);
   return getTasksForProject(tasks, project);
+}
+
+function getTaskHierarchyCode(task: Tarefa): string {
+  return String(task.wbs || task.id || "").trim();
+}
+
+function getTaskBusinessCode(task: Tarefa): string {
+  return String(task.externalId || task.id || "").trim();
+}
+
+function buildTaskReferenceLabel(task: Tarefa): string {
+  const businessId = getTaskBusinessCode(task);
+  const hierarchy = getTaskHierarchyCode(task);
+  const prefix = [businessId ? `ID ${businessId}` : "", hierarchy ? `WBS ${hierarchy}` : ""].filter(Boolean).join(" · ");
+  return prefix ? `${prefix} · ${task.tarefa}` : task.tarefa;
+}
+
+function isTaskComplete(task?: Tarefa): boolean {
+  if (!task) return false;
+  return task.status === "Concluído" || Number(task.percentual || 0) >= 100 || Boolean(task.dataFimReal);
+}
+
+function findPredecessorTask(predecessorTaskId: string, currentTask: Tarefa, tasks: Tarefa[], projects: Projeto[]): Tarefa | undefined {
+  const project = findProjectForTask(currentTask, projects);
+  const projectTasks = project ? getTasksForProject(tasks, project) : tasks.filter((task) => task.projeto === currentTask.projeto);
+  const reference = String(predecessorTaskId || "").trim();
+  if (!reference) return undefined;
+
+  return projectTasks.find((task) =>
+    task.id === reference ||
+    getTaskBusinessCode(task) === reference ||
+    getTaskHierarchyCode(task) === reference
+  );
+}
+
+export function getTaskReleaseState(task: Tarefa, tasks: Tarefa[], projects: Projeto[] = []): TaskReleaseState {
+  const predecessors = task.predecessors || [];
+  if (!predecessors.length) {
+    return {
+      status: "no_predecessors",
+      isReleased: true,
+      isBlocked: false,
+      blockers: [],
+      predecessorCount: 0,
+    };
+  }
+
+  const blockers = predecessors
+    .map((dependency) => {
+      const predecessorTask = findPredecessorTask(dependency.predecessorTaskId, task, tasks, projects);
+      if (predecessorTask && isTaskComplete(predecessorTask)) return null;
+
+      return {
+        predecessorTaskId: dependency.predecessorTaskId,
+        dependencyType: dependency.type || "FS",
+        task: predecessorTask,
+        label: predecessorTask ? buildTaskReferenceLabel(predecessorTask) : `Referência não encontrada: ${dependency.predecessorTaskId}`,
+        status: predecessorTask?.status || "Não encontrada",
+        missing: !predecessorTask,
+      } satisfies TaskReleaseBlocker;
+    })
+    .filter((item): item is TaskReleaseBlocker => Boolean(item));
+
+  return {
+    status: blockers.length ? "blocked" : "released",
+    isReleased: blockers.length === 0,
+    isBlocked: blockers.length > 0,
+    blockers,
+    predecessorCount: predecessors.length,
+  };
+}
+
+export function getProjectFlowBlockers(tasks: Tarefa[], project: Projeto, projects: Projeto[] = [project]): Array<{ task: Tarefa; releaseState: TaskReleaseState }> {
+  return getTasksForProject(tasks, project)
+    .filter((task) => !isTaskComplete(task))
+    .map((task) => ({ task, releaseState: getTaskReleaseState(task, tasks, projects) }))
+    .filter((item) => item.releaseState.isBlocked)
+    .sort((a, b) => {
+      const orderA = Number(a.task.sortOrder || 0);
+      const orderB = Number(b.task.sortOrder || 0);
+      if (orderA !== orderB) return orderA - orderB;
+      return getTaskHierarchyCode(a.task).localeCompare(getTaskHierarchyCode(b.task), undefined, { numeric: true });
+    });
 }
