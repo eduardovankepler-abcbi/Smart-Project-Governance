@@ -78,7 +78,7 @@ export interface Comentario {
   authorUserId?: number;
   authorName?: string;
   content: string;
-  commentType?: "comment" | "decision" | "action" | "risk" | "issue";
+  commentType?: "comment" | "decision" | "action" | "risk" | "issue" | "change_request" | "acceptance";
   ownerName?: string;
   dueDate?: string;
   resolutionStatus?: "open" | "resolved";

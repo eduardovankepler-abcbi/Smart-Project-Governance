@@ -49,10 +49,19 @@ const ACTIONABLE_LABELS: Record<NonNullable<Comentario["commentType"]>, string> 
   action: "Pendência",
   risk: "Risco",
   issue: "Impedimento",
+  change_request: "Mudança",
+  acceptance: "Aceite",
 };
 
 function normalizeActionableType(value?: string): NonNullable<Comentario["commentType"]> {
-  return value === "decision" || value === "action" || value === "risk" || value === "issue" ? value : "comment";
+  return value === "decision" ||
+    value === "action" ||
+    value === "risk" ||
+    value === "issue" ||
+    value === "change_request" ||
+    value === "acceptance"
+    ? value
+    : "comment";
 }
 
 export default function DashboardPage() {
@@ -431,7 +440,7 @@ export default function DashboardPage() {
                       return (
                         <div key={item.id || `${item.projectName}-${index}`} className="rounded-lg border border-border bg-background/60 p-3">
                           <div className="mb-2 flex flex-wrap items-center gap-2">
-                            <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${type === "risk" || type === "issue" ? "bg-destructive text-destructive-foreground" : "bg-secondary text-secondary-foreground"}`}>
+                            <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${type === "risk" || type === "issue" || type === "change_request" ? "bg-destructive text-destructive-foreground" : "bg-secondary text-secondary-foreground"}`}>
                               {ACTIONABLE_LABELS[type]}
                             </span>
                             {item.projectName ? <span className="text-xs text-muted-foreground">{item.projectName}</span> : null}

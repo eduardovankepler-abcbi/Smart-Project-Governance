@@ -26,7 +26,7 @@ module.exports = function (pool, auth) {
 
   function normalizeCommentType(value) {
     const normalized = sanitizeString(value, 30).toLowerCase();
-    return ["comment", "decision", "action", "risk", "issue"].includes(normalized) ? normalized : "comment";
+    return ["comment", "decision", "action", "risk", "issue", "change_request", "acceptance"].includes(normalized) ? normalized : "comment";
   }
 
   function normalizeResolutionStatus(value) {

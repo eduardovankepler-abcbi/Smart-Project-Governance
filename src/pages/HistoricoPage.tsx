@@ -35,7 +35,14 @@ function formatJsonDetails(value: unknown) {
 }
 
 function normalizeCommentType(value?: string): NonNullable<Comentario["commentType"]> {
-  return value === "decision" || value === "action" || value === "risk" || value === "issue" ? value : "comment";
+  return value === "decision" ||
+    value === "action" ||
+    value === "risk" ||
+    value === "issue" ||
+    value === "change_request" ||
+    value === "acceptance"
+    ? value
+    : "comment";
 }
 
 function normalizeResolutionStatus(value?: string): NonNullable<Comentario["resolutionStatus"]> {
@@ -137,6 +144,8 @@ export default function HistoricoPage() {
     action: "Pendência",
     risk: "Risco",
     issue: "Impedimento",
+    change_request: "Mudança",
+    acceptance: "Aceite",
   };
   const safeComments = Array.isArray(comments) ? comments : [];
   const safeAuditLogs = Array.isArray(auditLogs) ? auditLogs : [];
@@ -260,6 +269,8 @@ export default function HistoricoPage() {
                       <SelectItem value="action">Pendências</SelectItem>
                       <SelectItem value="risk">Riscos</SelectItem>
                       <SelectItem value="issue">Impedimentos</SelectItem>
+                      <SelectItem value="change_request">Mudanças</SelectItem>
+                      <SelectItem value="acceptance">Aceites</SelectItem>
                     </SelectContent>
                   </Select>
                   <Select value={resolutionStatusFilter} onValueChange={(value) => setResolutionStatusFilter(value as NonNullable<Comentario["resolutionStatus"]> | "all")}>
@@ -300,6 +311,8 @@ export default function HistoricoPage() {
                           <SelectItem value="action">Pendência</SelectItem>
                           <SelectItem value="risk">Risco</SelectItem>
                           <SelectItem value="issue">Impedimento</SelectItem>
+                          <SelectItem value="change_request">Solicitação de mudança</SelectItem>
+                          <SelectItem value="acceptance">Aceite</SelectItem>
                         </SelectContent>
                       </Select>
                       <Input value={ownerName} onChange={(e) => setOwnerName(e.target.value)} placeholder="Responsável" />
@@ -332,7 +345,7 @@ export default function HistoricoPage() {
                         <div className="flex flex-wrap items-center gap-2">
                           <MessageSquare size={16} className="text-primary" />
                           <Badge variant="outline">{item.entityType === "projeto" ? "Projeto" : "Tarefa"}</Badge>
-                          <Badge variant={type === "issue" || type === "risk" ? "destructive" : "secondary"}>
+                          <Badge variant={type === "issue" || type === "risk" || type === "change_request" ? "destructive" : "secondary"}>
                             {commentTypeLabel[type]}
                           </Badge>
                           <Badge variant={status === "resolved" ? "secondary" : "outline"}>
