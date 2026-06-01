@@ -13,6 +13,7 @@ import TarefasPage from "@/pages/TarefasPage";
 import AlocacoesPage from "@/pages/AlocacoesPage";
 import CapacidadePage from "@/pages/CapacidadePage";
 import GanttPage from "@/pages/GanttPage";
+import KanbanPage from "@/pages/KanbanPage";
 import RecursosPage from "@/pages/RecursosPage";
 import CadastroPage from "@/pages/CadastroPage";
 import GovernancaPage from "@/pages/GovernancaPage";
@@ -39,6 +40,7 @@ const App = () => (
                   <Route path="/governanca" element={<ProtectedRoute allowRoles={["admin", "pmo"]}><GovernancaPage /></ProtectedRoute>} />
                   <Route path="/projetos" element={<ProjetosPage />} />
                   <Route path="/tarefas" element={<TarefasPage />} />
+                  <Route path="/kanban" element={<KanbanPage />} />
                   <Route path="/alocacoes" element={<AlocacoesPage />} />
                   <Route path="/capacidade" element={<ProtectedRoute allowRoles={["admin", "pmo", "bi"]}><CapacidadePage /></ProtectedRoute>} />
                   <Route path="/historico" element={<HistoricoPage />} />

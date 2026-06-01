@@ -3,6 +3,7 @@ import { NavLink, useLocation } from "react-router-dom";
 import {
   LayoutDashboard,
   FolderKanban,
+  Kanban,
   ListTodo,
   GanttChart,
   Users,
@@ -60,6 +61,7 @@ const sections: NavSection[] = [
       },
       { to: "/projetos", label: "Projetos", icon: FolderKanban },
       { to: "/tarefas", label: "Tarefas", icon: ListTodo },
+      { to: "/kanban", label: "Quadro", icon: Kanban },
       { to: "/alocacoes", label: "Alocações", icon: Link2 },
       {
         to: "/capacidade",
