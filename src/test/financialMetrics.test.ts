@@ -58,6 +58,34 @@ describe("financial metrics", () => {
     expect(metrics.status).toBe("overrun");
   });
 
+  it("avoids exaggerated forecasts while progress is still too low", () => {
+    const metrics = calculateProjectFinancialMetrics(project({
+      valorPrevisto: 1000,
+      orcamentoAprovado: 1200,
+      valorGasto: 200,
+      conclusao: 5,
+    }));
+
+    expect(metrics.eac).toBe(1000);
+    expect(metrics.etc).toBe(800);
+    expect(metrics.projectedBalance).toBe(200);
+    expect(metrics.status).toBe("healthy");
+  });
+
+  it("uses actual spend as forecast for completed projects", () => {
+    const metrics = calculateProjectFinancialMetrics(project({
+      valorPrevisto: 1000,
+      orcamentoAprovado: 1200,
+      valorGasto: 900,
+      conclusao: 100,
+      status: "Concluído",
+    }));
+
+    expect(metrics.eac).toBe(900);
+    expect(metrics.etc).toBe(0);
+    expect(metrics.projectedBalance).toBe(300);
+  });
+
   it("summarizes portfolio financial exposure", () => {
     const summary = summarizeProjectFinancials([
       project({ id: 1, valorPrevisto: 1000, orcamentoAprovado: 1200, valorGasto: 400, conclusao: 50 }),

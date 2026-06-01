@@ -27,22 +27,28 @@ function roundMoney(value: number) {
   return Math.round((Number(value) || 0) * 100) / 100;
 }
 
+function isCompletedProject(project: Projeto, progressPct: number) {
+  return progressPct >= 100 || String(project.status || "").toLowerCase().includes("conclu");
+}
+
+function calculateEac(project: Projeto, plannedCost: number, spent: number, progressPct: number) {
+  if (isCompletedProject(project, progressPct)) return spent;
+  if (progressPct < 10 || spent <= 0) return Math.max(plannedCost, spent);
+  return spent / (progressPct / 100);
+}
+
 export function calculateProjectFinancialMetrics(project: Projeto): ProjectFinancialMetrics {
   const plannedCost = Number(project.valorPrevisto || 0);
   const approvedBudget = Number(project.orcamentoAprovado || 0);
   const spent = Number(project.valorGasto || 0);
   const progressPct = clampPercent(Number(project.conclusao || 0));
-  const progressRatio = progressPct / 100;
   const actualBalance = approvedBudget - spent;
   const consumptionPct = approvedBudget > 0 ? (spent / approvedBudget) * 100 : 0;
   const plannedConsumptionPct = approvedBudget > 0 ? (plannedCost / approvedBudget) * 100 : 0;
   const planVariance = approvedBudget - plannedCost;
   const planVariancePct = approvedBudget > 0 ? (planVariance / approvedBudget) * 100 : 0;
 
-  const eac =
-    progressRatio > 0 && spent > 0
-      ? spent / progressRatio
-      : Math.max(plannedCost, spent);
+  const eac = calculateEac(project, plannedCost, spent, progressPct);
   const etc = Math.max(eac - spent, 0);
   const projectedBalance = approvedBudget - eac;
 
