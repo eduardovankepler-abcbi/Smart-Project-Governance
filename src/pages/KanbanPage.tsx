@@ -3,7 +3,24 @@ import Header from "@/components/Header";
 import { useData } from "@/contexts/DataContext";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { CalendarClock, CheckCircle2, Circle, Clock3, MessageSquare, PauseCircle, UserRound, XCircle } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Progress } from "@/components/ui/progress";
+import {
+  CalendarClock,
+  CheckCircle2,
+  Circle,
+  Clock3,
+  DollarSign,
+  GitBranch,
+  Maximize2,
+  MessageSquare,
+  PauseCircle,
+  TimerReset,
+  UserRound,
+  Users,
+  XCircle,
+} from "lucide-react";
 import type { Projeto, Tarefa } from "@/data/projectData";
 import { getTaskBusinessId, getTaskDisplayHierarchy } from "@/utils/taskIdentity";
 import { getTaskReleaseState, getTaskResourceNames, getTasksForProject } from "@/utils/projectModel";
@@ -35,6 +52,20 @@ function formatShortDate(value?: string) {
   const date = parseDate(value);
   if (!date) return "Sem prazo";
   return date.toLocaleDateString("pt-BR", { day: "2-digit", month: "short" });
+}
+
+function formatFullDate(value?: string) {
+  const date = parseDate(value);
+  if (!date) return "Não informado";
+  return date.toLocaleDateString("pt-BR", { day: "2-digit", month: "long", year: "numeric" });
+}
+
+function formatHours(value?: number) {
+  return `${Number(value || 0).toFixed(1)}h`;
+}
+
+function formatCurrency(value?: number) {
+  return Number(value || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
 
 function getInitials(name: string) {
@@ -96,7 +127,180 @@ function ResourceAvatar({ name, index }: { name: string; index: number }) {
   );
 }
 
-function TaskCard({ task, allTasks, projects }: { task: Tarefa; allTasks: Tarefa[]; projects: Projeto[] }) {
+function DetailItem({ label, value }: { label: string; value: React.ReactNode }) {
+  return (
+    <div className="rounded-lg border border-border/70 bg-background/40 px-3 py-2">
+      <p className="text-[11px] uppercase tracking-wide text-muted-foreground">{label}</p>
+      <div className="mt-1 break-words text-sm font-semibold text-foreground">{value || "—"}</div>
+    </div>
+  );
+}
+
+function TaskExpansionModal({
+  task,
+  allTasks,
+  projects,
+  open,
+  onOpenChange,
+}: {
+  task: Tarefa | null;
+  allTasks: Tarefa[];
+  projects: Projeto[];
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
+  const release = task ? getTaskReleaseState(task, allTasks, projects) : null;
+  const resources = task ? getTaskResourceNames(task) : [];
+  const predecessorRows = task?.predecessors?.map((predecessor) => {
+    const predecessorTask = allTasks.find((candidate) => candidate.id === predecessor.predecessorTaskId);
+    return {
+      predecessor,
+      task: predecessorTask,
+      label: predecessorTask
+        ? `${getTaskDisplayHierarchy(predecessorTask)} ${predecessorTask.tarefa}`
+        : predecessor.predecessorTaskId,
+    };
+  }) || [];
+
+  if (!task) return null;
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="flex h-[92vh] max-h-[92vh] w-[94vw] max-w-[1180px] flex-col gap-4 overflow-hidden border-border/90 bg-card p-6 shadow-2xl">
+        <DialogHeader className="pr-8">
+          <DialogDescription className="font-mono text-xs">
+            {task.projeto} · ID {getTaskBusinessId(task) || task.id} · WBS {getTaskDisplayHierarchy(task)}
+          </DialogDescription>
+          <DialogTitle className="break-words text-2xl font-display leading-tight">{task.tarefa}</DialogTitle>
+        </DialogHeader>
+
+        <div className="min-h-0 flex-1 overflow-y-auto pr-1">
+          <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_340px]">
+            <section className="min-w-0 space-y-4">
+              <div className="rounded-xl border border-border/80 bg-background/35 p-4">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Badge variant="outline" className="font-mono">ID {getTaskBusinessId(task) || task.id}</Badge>
+                    <Badge variant={task.status === "Atrasado" ? "destructive" : "secondary"}>{task.status}</Badge>
+                    {task.milestone ? <Badge variant="outline">Marco</Badge> : null}
+                    {task.taskType ? <Badge variant="outline">{task.taskType}</Badge> : null}
+                  </div>
+                  <div className="text-sm font-semibold text-foreground">{Math.round(Number(task.percentual || 0))}% concluído</div>
+                </div>
+                <Progress value={Number(task.percentual || 0)} className="mt-4 h-2.5" />
+              </div>
+
+              {release?.isBlocked ? (
+                <div className="rounded-xl border border-destructive/25 bg-destructive/10 p-4 text-destructive">
+                  <div className="flex items-start gap-3">
+                    <XCircle size={18} className="mt-0.5 shrink-0" />
+                    <div>
+                      <p className="font-semibold">Fluxo parado por predecessora pendente</p>
+                      <p className="mt-1 text-sm leading-6">
+                        {release.blockers.map((blocker) => blocker.label).join(", ")}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              ) : release?.status === "released" && task.status !== "Concluído" ? (
+                <div className="rounded-xl border border-success/25 bg-success/10 p-4 text-success">
+                  <div className="flex items-center gap-3">
+                    <CheckCircle2 size={18} />
+                    <p className="font-semibold">Tarefa liberada pelas predecessoras.</p>
+                  </div>
+                </div>
+              ) : null}
+
+              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                <DetailItem label="Início planejado" value={formatFullDate(task.dataInicioPlanej)} />
+                <DetailItem label="Fim planejado" value={formatFullDate(task.dataFimPlanej)} />
+                <DetailItem label="Duração" value={formatHours(task.durationMinutes ? task.durationMinutes / 60 : task.diasPlanejados * 8)} />
+                <DetailItem label="Início real" value={formatFullDate(task.dataInicioReal)} />
+                <DetailItem label="Fim real" value={formatFullDate(task.dataFimReal)} />
+                <DetailItem label="Esforço real" value={formatHours(task.esforcoReal)} />
+              </div>
+
+              <div className="grid gap-4 lg:grid-cols-2">
+                <div className="rounded-xl border border-border/80 bg-background/35 p-4">
+                  <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-foreground">
+                    <Users size={16} />
+                    Recursos
+                  </div>
+                  <div className="space-y-2">
+                    {resources.length ? resources.map((name, index) => (
+                      <div key={name} className="flex items-center gap-2 rounded-lg border border-border/60 bg-card/70 px-3 py-2 text-sm">
+                        <ResourceAvatar name={name} index={index} />
+                        <span className="break-words">{name}</span>
+                      </div>
+                    )) : <p className="text-sm text-muted-foreground">Nenhum recurso alocado.</p>}
+                  </div>
+                </div>
+
+                <div className="rounded-xl border border-border/80 bg-background/35 p-4">
+                  <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-foreground">
+                    <GitBranch size={16} />
+                    Predecessoras
+                  </div>
+                  <div className="space-y-2">
+                    {predecessorRows.length ? predecessorRows.map(({ predecessor, task: predecessorTask, label }) => (
+                      <div key={`${predecessor.predecessorTaskId}-${predecessor.type}`} className="rounded-lg border border-border/60 bg-card/70 px-3 py-2 text-sm">
+                        <p className="break-words font-medium text-foreground">{label}</p>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          Tipo {predecessor.type || "FS"} · Lag {formatHours(Number(predecessor.lagMinutes || 0) / 60)}
+                          {predecessorTask ? ` · ${predecessorTask.status} · ${Math.round(Number(predecessorTask.percentual || 0))}%` : " · não encontrada"}
+                        </p>
+                      </div>
+                    )) : <p className="text-sm text-muted-foreground">Sem predecessoras registradas.</p>}
+                  </div>
+                </div>
+              </div>
+
+              {task.notes ? (
+                <div className="rounded-xl border border-border/80 bg-background/35 p-4">
+                  <p className="mb-2 text-sm font-semibold text-foreground">Notas</p>
+                  <p className="whitespace-pre-wrap break-words text-sm leading-6 text-muted-foreground">{task.notes}</p>
+                </div>
+              ) : null}
+            </section>
+
+            <aside className="space-y-4">
+              <div className="rounded-xl border border-border/80 bg-background/35 p-4">
+                <p className="mb-3 text-sm font-semibold text-foreground">Resumo operacional</p>
+                <div className="grid gap-3">
+                  <DetailItem label="Responsável" value={task.responsavel || "Não informado"} />
+                  <DetailItem label="Função" value={task.funcao || "Não informado"} />
+                  <DetailItem label="Esforço planejado" value={formatHours(task.esforcoPlanej)} />
+                  <DetailItem label="Esforço restante" value={formatHours(Math.max(Number(task.esforcoPlanej || 0) - Number(task.esforcoReal || 0), 0))} />
+                </div>
+              </div>
+
+              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
+                <div className="rounded-xl border border-border/80 bg-background/35 p-4">
+                  <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-foreground">
+                    <DollarSign size={16} />
+                    Custo
+                  </div>
+                  <p className="text-2xl font-display font-bold">{formatCurrency(task.valorPrevisto)}</p>
+                  <p className="mt-1 text-xs text-muted-foreground">Gasto: {formatCurrency(task.valorGasto)}</p>
+                </div>
+                <div className="rounded-xl border border-border/80 bg-background/35 p-4">
+                  <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-foreground">
+                    <TimerReset size={16} />
+                    Identificação
+                  </div>
+                  <p className="break-all text-sm font-mono text-foreground">{task.id}</p>
+                  <p className="mt-1 text-xs text-muted-foreground">Nível {task.outlineLevel || "—"} · Ordem {task.sortOrder || "—"}</p>
+                </div>
+              </div>
+            </aside>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function TaskCard({ task, allTasks, projects, onExpand }: { task: Tarefa; allTasks: Tarefa[]; projects: Projeto[]; onExpand: (task: Tarefa) => void }) {
   const release = getTaskReleaseState(task, allTasks, projects);
   const resources = getTaskResourceNames(task);
   const blocker = release.blockers[0];
@@ -116,6 +320,15 @@ function TaskCard({ task, allTasks, projects }: { task: Tarefa; allTasks: Tarefa
             <Badge variant={isLate ? "destructive" : "secondary"} className="text-[10px]">{task.status}</Badge>
           </div>
         </div>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="-mr-1 -mt-1 h-7 w-7 shrink-0"
+          title="Expandir tarefa"
+          onClick={() => onExpand(task)}
+        >
+          <Maximize2 size={13} />
+        </Button>
       </div>
 
       {release.isBlocked ? (
@@ -157,6 +370,7 @@ export default function KanbanPage() {
   const { projetos, tarefas, getUniqueProjetos } = useData();
   const projectNames = useMemo(() => getUniqueProjetos(), [getUniqueProjetos]);
   const [selectedProjectName, setSelectedProjectName] = useState(projectNames[0] || "");
+  const [expandedTask, setExpandedTask] = useState<Tarefa | null>(null);
 
   const selectedProject = useMemo(
     () => projetos.find((project) => project.projeto === selectedProjectName) || projetos[0],
@@ -222,7 +436,7 @@ export default function KanbanPage() {
                   </div>
                   <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-3">
                     {column.tasks.map((task) => (
-                      <TaskCard key={task.id} task={task} allTasks={tarefas} projects={projetos} />
+                      <TaskCard key={task.id} task={task} allTasks={tarefas} projects={projetos} onExpand={setExpandedTask} />
                     ))}
                     {column.tasks.length === 0 ? (
                       <div className="rounded-lg border border-dashed border-border p-4 text-center text-xs text-muted-foreground">
@@ -236,6 +450,13 @@ export default function KanbanPage() {
           </div>
         </div>
       </div>
+      <TaskExpansionModal
+        task={expandedTask}
+        allTasks={tarefas}
+        projects={projetos}
+        open={!!expandedTask}
+        onOpenChange={(open) => !open && setExpandedTask(null)}
+      />
     </div>
   );
 }
