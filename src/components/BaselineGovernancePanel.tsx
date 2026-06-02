@@ -17,6 +17,11 @@ import { ResponsiveContainer, CartesianGrid, Legend, Line, LineChart, Tooltip, X
 import { formatCurrency } from "@/contexts/DataContext";
 import { CalendarDays, Check, FileDown, GitBranchPlus, Plus, Save, ShieldCheck, Trash2, Upload, X } from "lucide-react";
 import ChartPreviewModal from "@/components/ChartPreviewModal";
+import {
+  normalizeManualCurveTemplateDate,
+  normalizeManualCurveTemplateHeader,
+  normalizeManualCurveTemplatePercent,
+} from "@/utils/manualCurveTemplate";
 
 interface BaselineGovernancePanelProps {
   selectedProject: Projeto | null;
@@ -64,48 +69,6 @@ function normalizePercentInput(value: string) {
   const parsed = Number(normalized);
   if (!Number.isFinite(parsed)) return 0;
   return Math.min(100, Math.max(0, parsed));
-}
-
-function normalizeTemplatePercent(value: unknown) {
-  if (value == null || value === "") return "";
-  const raw = typeof value === "object" && value && "result" in value ? (value as { result: unknown }).result : value;
-  const parsed = Number(String(raw).replace(",", "."));
-  if (!Number.isFinite(parsed)) return "";
-  const percent = parsed > 0 && parsed <= 1 ? parsed * 100 : parsed;
-  return String(Math.min(100, Math.max(0, Number(percent.toFixed(2)))));
-}
-
-function normalizeTemplateDate(value: unknown) {
-  if (!value) return "";
-  if (value instanceof Date && !Number.isNaN(value.getTime())) return value.toISOString().slice(0, 10);
-  if (typeof value === "number" && value > 1 && value < 200000) {
-    const epoch = new Date(Date.UTC(1899, 11, 30));
-    return new Date(epoch.getTime() + value * 86400000).toISOString().slice(0, 10);
-  }
-  const raw = String(value).trim();
-  const date = new Date(raw);
-  if (!Number.isNaN(date.getTime())) return date.toISOString().slice(0, 10);
-  const slash = raw.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/);
-  if (!slash) return "";
-  let month = Number(slash[1]);
-  let day = Number(slash[2]);
-  let year = Number(slash[3]);
-  if (Number(slash[1]) > 12) {
-    day = Number(slash[1]);
-    month = Number(slash[2]);
-  }
-  if (year < 100) year += 2000;
-  const parsed = new Date(Date.UTC(year, month - 1, day));
-  return Number.isNaN(parsed.getTime()) ? "" : parsed.toISOString().slice(0, 10);
-}
-
-function normalizeTemplateHeader(value: unknown) {
-  return String(value || "")
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/\s+/g, " ")
-    .trim();
 }
 
 const MANUAL_CURVE_COLORS = [
@@ -479,14 +442,14 @@ export default function BaselineGovernancePanel({ selectedProject }: BaselineGov
       if (!sheet) throw new Error("Planilha sem dados para importar");
 
       const headers = sheet.getRow(1).values as unknown[];
-      const dataColumn = headers.findIndex((header) => normalizeTemplateHeader(header) === "data");
+      const dataColumn = headers.findIndex((header) => normalizeManualCurveTemplateHeader(header) === "data");
       if (dataColumn <= 0) throw new Error("Coluna data é obrigatória no template");
 
       const baselineColumns: Array<{ column: number; baselineNumber: number; label: string }> = [];
       let actualColumn = 0;
       let observationColumn = 0;
       headers.forEach((header, index) => {
-        const normalized = normalizeTemplateHeader(header);
+        const normalized = normalizeManualCurveTemplateHeader(header);
         const baselineMatch = normalized.match(/^linha base (\d+)$/);
         if (baselineMatch) {
           const baselineNumber = Number(baselineMatch[1]);
@@ -503,14 +466,14 @@ export default function BaselineGovernancePanel({ selectedProject }: BaselineGov
       const rows: Array<{ date: string; values: Record<number, string>; actual?: string; observation: string }> = [];
       for (let rowIndex = 2; rowIndex <= sheet.rowCount; rowIndex += 1) {
         const row = sheet.getRow(rowIndex);
-        const date = normalizeTemplateDate(row.getCell(dataColumn).value);
+        const date = normalizeManualCurveTemplateDate(row.getCell(dataColumn).value);
         if (!date) continue;
         const values: Record<number, string> = {};
         baselineColumns.forEach((item) => {
-          const percent = normalizeTemplatePercent(row.getCell(item.column).value);
+          const percent = normalizeManualCurveTemplatePercent(row.getCell(item.column).value);
           if (percent !== "") values[item.baselineNumber] = percent;
         });
-        const actual = actualColumn ? normalizeTemplatePercent(row.getCell(actualColumn).value) : "";
+        const actual = actualColumn ? normalizeManualCurveTemplatePercent(row.getCell(actualColumn).value) : "";
         const observation = observationColumn ? String(row.getCell(observationColumn).text || row.getCell(observationColumn).value || "").slice(0, manualCurve?.limits.observationMaxLength || 255) : "";
         rows.push({ date, values, actual: actual || undefined, observation });
       }
