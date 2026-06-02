@@ -379,27 +379,35 @@ function KanbanBoard({
   onExpandTask: (task: Tarefa) => void;
   expanded?: boolean;
 }) {
+  const boardWrapperClass = expanded ? "h-full min-h-0 overflow-x-auto overflow-y-hidden" : "overflow-x-auto pb-2";
+  const boardGridClass = expanded
+    ? "grid h-full min-w-[1180px] grid-cols-[repeat(6,minmax(0,1fr))] gap-2 xl:min-w-0"
+    : "grid min-w-[1320px] grid-cols-6 gap-3";
+  const columnClass = expanded
+    ? "min-h-0"
+    : "max-h-[calc(100vh-230px)] min-h-[540px]";
+
   return (
-    <div className="overflow-x-auto pb-2">
-      <div className={`grid grid-cols-6 gap-3 ${expanded ? "min-w-[1560px]" : "min-w-[1320px]"}`}>
+    <div className={boardWrapperClass}>
+      <div className={boardGridClass}>
         {columns.map((column) => {
           const Icon = column.icon;
           return (
             <section
               key={column.id}
-              className={`flex flex-col rounded-lg border border-border bg-muted/30 ${expanded ? "max-h-[calc(96vh-170px)] min-h-[620px]" : "max-h-[calc(100vh-230px)] min-h-[540px]"}`}
+              className={`flex flex-col overflow-hidden rounded-lg border border-border bg-muted/30 ${columnClass}`}
             >
-              <div className="flex items-center justify-between gap-3 border-b border-border px-3 py-3">
-                <div className="flex items-center gap-2">
+              <div className={`flex items-center justify-between gap-2 border-b border-border ${expanded ? "px-3 py-2.5" : "px-3 py-3"}`}>
+                <div className="flex min-w-0 items-center gap-2">
                   <span className={`h-2.5 w-2.5 rounded-full ${column.tone}`} />
-                  <h3 className="text-sm font-semibold uppercase tracking-wide text-foreground">{column.title}</h3>
+                  <h3 className="truncate text-sm font-semibold uppercase tracking-wide text-foreground">{column.title}</h3>
                 </div>
-                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                <div className="flex shrink-0 items-center gap-2 text-xs text-muted-foreground">
                   <Icon size={14} />
                   <span>{column.tasks.length}</span>
                 </div>
               </div>
-              <div className={`min-h-0 flex-1 space-y-3 overflow-y-auto ${expanded ? "p-4" : "p-3"}`}>
+              <div className={`min-h-0 flex-1 space-y-3 overflow-y-auto ${expanded ? "p-2.5" : "p-3"}`}>
                 {column.tasks.map((task) => (
                   <TaskCard key={task.id} task={task} allTasks={allTasks} projects={projects} onExpand={onExpandTask} />
                 ))}
@@ -442,14 +450,14 @@ function BoardExpansionModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="flex h-[96vh] max-h-[96vh] w-[98vw] max-w-[98vw] flex-col gap-4 overflow-hidden border-border/90 bg-background p-5 shadow-2xl">
-        <DialogHeader className="pr-8">
+      <DialogContent className="flex h-[calc(100dvh-12px)] max-h-[calc(100dvh-12px)] w-[calc(100vw-12px)] max-w-none flex-col gap-3 overflow-hidden border-border/90 bg-background p-4 shadow-2xl">
+        <DialogHeader className="shrink-0 pr-8">
           <DialogDescription className="text-[11px] font-semibold uppercase tracking-[0.22em] text-muted-foreground">
             Quadro expandido
           </DialogDescription>
-          <div className="flex flex-wrap items-start justify-between gap-4">
+          <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="min-w-0">
-              <DialogTitle className="break-words text-2xl font-display leading-tight">
+              <DialogTitle className="break-words text-xl font-display leading-tight xl:text-2xl">
                 {project?.projeto || "Selecione um projeto"}
               </DialogTitle>
               <div className="mt-2 flex flex-wrap gap-2">
