@@ -10,9 +10,11 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ResponsiveContainer, CartesianGrid, Legend, Line, LineChart, Tooltip, XAxis, YAxis } from "recharts";
 import { formatCurrency } from "@/contexts/DataContext";
-import { GitBranchPlus, ShieldCheck } from "lucide-react";
+import { CalendarDays, Check, GitBranchPlus, Plus, Save, ShieldCheck, X } from "lucide-react";
 import ChartPreviewModal from "@/components/ChartPreviewModal";
 
 interface BaselineGovernancePanelProps {
@@ -38,9 +40,44 @@ function getStatusBadgeVariant(status: ProjectBaseline["status"]) {
   return "destructive";
 }
 
+function getManualStatusBadgeVariant(status: api.ManualCurveSSeries["status"]) {
+  if (status === "approved") return "default";
+  if (status === "pending_approval") return "secondary";
+  if (status === "draft") return "outline";
+  return "destructive";
+}
+
 function buildCurveTooltipStyle() {
   return { background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: "8px", color: "hsl(var(--foreground))" };
 }
+
+function formatIsoDate(value: string) {
+  if (!value) return "—";
+  const date = new Date(`${value}T00:00:00`);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleDateString("pt-BR", { day: "2-digit", month: "short", year: "2-digit" });
+}
+
+function normalizePercentInput(value: string) {
+  const normalized = String(value || "").replace(",", ".").trim();
+  const parsed = Number(normalized);
+  if (!Number.isFinite(parsed)) return 0;
+  return Math.min(100, Math.max(0, parsed));
+}
+
+const MANUAL_CURVE_COLORS = [
+  "hsl(217, 91%, 60%)",
+  "hsl(262, 83%, 68%)",
+  "hsl(189, 94%, 43%)",
+  "hsl(32, 95%, 55%)",
+  "hsl(339, 82%, 62%)",
+  "hsl(142, 71%, 40%)",
+  "hsl(0, 78%, 45%)",
+  "hsl(45, 93%, 47%)",
+  "hsl(199, 89%, 48%)",
+  "hsl(160, 84%, 39%)",
+  "hsl(0, 0%, 70%)",
+];
 
 export default function BaselineGovernancePanel({ selectedProject }: BaselineGovernancePanelProps) {
   const { canWrite, hasRole } = useAuth();
@@ -53,9 +90,15 @@ export default function BaselineGovernancePanel({ selectedProject }: BaselineGov
   const [approvalNotes, setApprovalNotes] = useState<Record<number, string>>({});
   const [baselines, setBaselines] = useState<ProjectBaseline[]>([]);
   const [curveData, setCurveData] = useState<ProjectCurveSResponse | null>(null);
+  const [manualCurve, setManualCurve] = useState<api.ManualCurveSResponse | null>(null);
+  const [manualPointValues, setManualPointValues] = useState<Record<string, string>>({});
+  const [manualObservations, setManualObservations] = useState<Record<string, string>>({});
+  const [manualApprovalNotes, setManualApprovalNotes] = useState<Record<number, string>>({});
   const [loadingBaselines, setLoadingBaselines] = useState(false);
   const [loadingCurve, setLoadingCurve] = useState(false);
+  const [loadingManualCurve, setLoadingManualCurve] = useState(false);
   const [submittingBaseline, setSubmittingBaseline] = useState(false);
+  const [savingManualCurve, setSavingManualCurve] = useState(false);
 
   const officialBaseline = useMemo(
     () => baselines.find((baseline) => baseline.isOfficial) || null,
@@ -66,6 +109,37 @@ export default function BaselineGovernancePanel({ selectedProject }: BaselineGov
     [baselines]
   );
   const curveTooltipStyle = useMemo(() => buildCurveTooltipStyle(), []);
+  const manualSeries = useMemo(() => {
+    if (!manualCurve) return [];
+    return manualCurve.series.slice().sort((a, b) => {
+      if (a.seriesType !== b.seriesType) return a.seriesType === "baseline" ? -1 : 1;
+      return a.baselineNumber - b.baselineNumber;
+    });
+  }, [manualCurve]);
+  const manualRows = useMemo(() => {
+    if (!manualCurve) return [];
+    const dates = new Set<string>(manualCurve.defaultDates);
+    manualCurve.points.forEach((point) => point.date && dates.add(point.date));
+    manualCurve.observations.forEach((item) => item.date && dates.add(item.date));
+    return Array.from(dates).sort();
+  }, [manualCurve]);
+  const manualChartData = useMemo(() => {
+    return manualRows.map((date) => {
+      const row: Record<string, string | number> = { date, label: formatIsoDate(date) };
+      manualSeries.forEach((series) => {
+        row[`series-${series.id}`] = normalizePercentInput(manualPointValues[`${series.id}:${date}`] || "0");
+      });
+      return row;
+    });
+  }, [manualPointValues, manualRows, manualSeries]);
+  const nextManualBaselineNumber = useMemo(() => {
+    const used = new Set(manualSeries.filter((series) => series.seriesType === "baseline").map((series) => series.baselineNumber));
+    for (let index = 1; index <= (manualCurve?.limits.maxBaselines || 10); index += 1) {
+      if (!used.has(index)) return index;
+    }
+    return 0;
+  }, [manualCurve?.limits.maxBaselines, manualSeries]);
+  const hasActualSeries = manualSeries.some((series) => series.seriesType === "actual");
 
   useEffect(() => {
     async function loadBaselines() {
@@ -118,6 +192,53 @@ export default function BaselineGovernancePanel({ selectedProject }: BaselineGov
     }
     loadCurve();
   }, [curveMetric, selectedBaselineId, selectedProject, toast]);
+
+  useEffect(() => {
+    async function loadManualCurve() {
+      if (!selectedProject) {
+        setManualCurve(null);
+        setManualPointValues({});
+        setManualObservations({});
+        return;
+      }
+      setLoadingManualCurve(true);
+      try {
+        const response = await api.getManualCurveS(selectedProject.id);
+        setManualCurve(response);
+        const points: Record<string, string> = {};
+        response.points.forEach((point) => {
+          if (point.seriesId && point.date) points[`${point.seriesId}:${point.date}`] = String(point.percent ?? 0);
+        });
+        const observations: Record<string, string> = {};
+        response.observations.forEach((item) => {
+          if (item.date) observations[item.date] = item.observation || "";
+        });
+        setManualPointValues(points);
+        setManualObservations(observations);
+      } catch (error) {
+        toast({ title: "Erro", description: (error as Error).message, variant: "destructive" });
+      } finally {
+        setLoadingManualCurve(false);
+      }
+    }
+    loadManualCurve();
+  }, [selectedProject, toast]);
+
+  async function reloadManualCurve() {
+    if (!selectedProject) return;
+    const response = await api.getManualCurveS(selectedProject.id);
+    setManualCurve(response);
+    const points: Record<string, string> = {};
+    response.points.forEach((point) => {
+      if (point.seriesId && point.date) points[`${point.seriesId}:${point.date}`] = String(point.percent ?? 0);
+    });
+    const observations: Record<string, string> = {};
+    response.observations.forEach((item) => {
+      if (item.date) observations[item.date] = item.observation || "";
+    });
+    setManualPointValues(points);
+    setManualObservations(observations);
+  }
 
   async function reloadBaselineData(nextBaselineId?: number) {
     if (!selectedProject) return;
@@ -181,6 +302,80 @@ export default function BaselineGovernancePanel({ selectedProject }: BaselineGov
     }
   }
 
+  async function handleCreateManualSeries(seriesType: api.ManualCurveSSeries["seriesType"]) {
+    if (!selectedProject) return;
+    const baselineNumber = seriesType === "actual" ? 0 : nextManualBaselineNumber;
+    if (seriesType === "baseline" && !baselineNumber) {
+      toast({ title: "Limite atingido", description: "O projeto já possui 10 linhas base manuais.", variant: "destructive" });
+      return;
+    }
+    setSavingManualCurve(true);
+    try {
+      const created = await api.createManualCurveSSeries({
+        projectId: selectedProject.id,
+        seriesType,
+        baselineNumber,
+        seriesName: seriesType === "actual" ? "Realizado" : `Linha Base ${baselineNumber}`,
+        justification: seriesType === "baseline" ? "Criação manual pela Curva S" : "",
+      });
+      toast({
+        title: seriesType === "actual" ? "Realizado criado" : "Linha base criada",
+        description: created.status === "pending_approval" ? "A linha base aguarda aprovação do administrador." : undefined,
+      });
+      await reloadManualCurve();
+    } catch (error) {
+      toast({ title: "Erro", description: (error as Error).message, variant: "destructive" });
+    } finally {
+      setSavingManualCurve(false);
+    }
+  }
+
+  async function handleSaveManualCurve() {
+    if (!selectedProject || !manualCurve) return;
+    setSavingManualCurve(true);
+    try {
+      for (const series of manualSeries) {
+        const points = manualRows.map((date) => ({
+          date,
+          percent: normalizePercentInput(manualPointValues[`${series.id}:${date}`] || "0"),
+        }));
+        await api.saveManualCurveSPoints(series.id, points);
+      }
+      await api.saveManualCurveSObservations(selectedProject.id, manualRows.map((date) => ({
+        date,
+        observation: (manualObservations[date] || "").slice(0, manualCurve.limits.observationMaxLength),
+      })));
+      toast({ title: "Curva S manual salva" });
+      await reloadManualCurve();
+    } catch (error) {
+      toast({ title: "Erro", description: (error as Error).message, variant: "destructive" });
+    } finally {
+      setSavingManualCurve(false);
+    }
+  }
+
+  async function handleApproveManualSeries(seriesId: number) {
+    try {
+      await api.approveManualCurveSSeries(seriesId, manualApprovalNotes[seriesId] || "");
+      toast({ title: "Linha base manual aprovada" });
+      setManualApprovalNotes((current) => ({ ...current, [seriesId]: "" }));
+      await reloadManualCurve();
+    } catch (error) {
+      toast({ title: "Erro", description: (error as Error).message, variant: "destructive" });
+    }
+  }
+
+  async function handleRejectManualSeries(seriesId: number) {
+    try {
+      await api.rejectManualCurveSSeries(seriesId, manualApprovalNotes[seriesId] || "");
+      toast({ title: "Linha base manual rejeitada" });
+      setManualApprovalNotes((current) => ({ ...current, [seriesId]: "" }));
+      await reloadManualCurve();
+    } catch (error) {
+      toast({ title: "Erro", description: (error as Error).message, variant: "destructive" });
+    }
+  }
+
   if (!selectedProject) {
     return (
       <Card className="border-border/80 bg-card/[0.92] shadow-[0_18px_40px_-32px_rgba(15,23,42,0.42)]">
@@ -209,6 +404,37 @@ export default function BaselineGovernancePanel({ selectedProject }: BaselineGov
         <Line type="monotone" dataKey="planned" name="Planejado" stroke="hsl(217, 91%, 60%)" strokeWidth={2} dot={false} />
         <Line type="monotone" dataKey="actual" name="Realizado" stroke="hsl(142, 71%, 40%)" strokeWidth={2} dot={false} />
         <Line type="monotone" dataKey="variance" name="Desvio" stroke="hsl(0, 78%, 45%)" strokeWidth={2} dot={false} />
+      </LineChart>
+    </ResponsiveContainer>
+  );
+
+  const renderManualCurveChart = (height: number) => (
+    <ResponsiveContainer width="100%" height={height}>
+      <LineChart data={manualChartData}>
+        <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+        <XAxis dataKey="label" tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} />
+        <YAxis tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} domain={[0, 100]} tickFormatter={(value) => `${value}%`} />
+        <Tooltip
+          contentStyle={curveTooltipStyle}
+          formatter={(value: number, key: string) => {
+            const series = manualSeries.find((item) => `series-${item.id}` === key);
+            return [`${Number(value).toFixed(1)}%`, series?.seriesName || key];
+          }}
+          labelFormatter={(label) => `Semana de ${label}`}
+        />
+        <Legend />
+        {manualSeries.map((series, index) => (
+          <Line
+            key={series.id}
+            type="monotone"
+            dataKey={`series-${series.id}`}
+            name={series.seriesName}
+            stroke={MANUAL_CURVE_COLORS[index % MANUAL_CURVE_COLORS.length]}
+            strokeWidth={series.seriesType === "actual" ? 3 : 2}
+            strokeDasharray={series.status === "pending_approval" ? "5 5" : undefined}
+            dot={false}
+          />
+        ))}
       </LineChart>
     </ResponsiveContainer>
   );
@@ -334,80 +560,210 @@ export default function BaselineGovernancePanel({ selectedProject }: BaselineGov
 
       <Card className="border-border/80 bg-card/[0.92] shadow-[0_18px_40px_-32px_rgba(15,23,42,0.42)]">
         <CardContent className="space-y-5 p-5">
-          <div className="space-y-4">
-            <div className="flex items-start justify-between gap-4">
+          <Tabs defaultValue="automatic" className="space-y-5">
+            <div className="flex flex-wrap items-start justify-between gap-4">
               <div className="space-y-1 pr-3">
                 <h3 className="text-sm font-display font-semibold text-foreground">Curva S Semanal</h3>
-                <p className="max-w-xl text-sm text-muted-foreground">Compare baseline selecionada com a execução atual por esforço, custo ou progresso.</p>
+                <p className="max-w-xl text-sm text-muted-foreground">Compare a curva calculada pelo cronograma com a curva gerencial manual.</p>
               </div>
-              <ChartPreviewModal
-                title="Curva S Semanal"
-                description="Visualização ampliada da comparação entre baseline e execução atual."
-                renderChart={renderCurveChart}
-                expandedHeight={640}
-              />
+              <TabsList>
+                <TabsTrigger value="automatic">Automática</TabsTrigger>
+                <TabsTrigger value="manual">Manual</TabsTrigger>
+              </TabsList>
             </div>
-            <div className="flex flex-wrap items-end justify-end gap-3">
-              <Select value={curveMetric} onValueChange={(value) => setCurveMetric(value as ProjectCurveSResponse["metric"])}>
-                <SelectTrigger className="w-40">
-                  <SelectValue placeholder="Métrica" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="effort">Esforço</SelectItem>
-                  <SelectItem value="cost">Custo</SelectItem>
-                  <SelectItem value="progress">Progresso</SelectItem>
-                </SelectContent>
-              </Select>
-              <Select value={selectedBaselineId} onValueChange={setSelectedBaselineId}>
-                <SelectTrigger className="w-64">
-                  <SelectValue placeholder="Baseline" />
-                </SelectTrigger>
-                <SelectContent>
-                  {baselines.length === 0 ? <SelectItem value="none" disabled>Sem baseline disponível</SelectItem> : baselines.map((baseline) => (
-                    <SelectItem key={baseline.id} value={String(baseline.id)}>
-                      LB {String(baseline.baselineNumber).padStart(2, "0")} · {baseline.baselineName}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
 
-          {curveData?.baseline ? (
-            <div className="grid gap-3 md:grid-cols-3">
-              <div className="rounded-xl border border-border/70 bg-background/[0.60] p-4">
-                <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Baseline em comparação</p>
-                <p className="mt-2 text-sm font-medium text-foreground">{curveData.baseline.baselineName}</p>
-                <p className="mt-1 text-xs text-muted-foreground">{curveData.baseline.isOfficial ? "Oficial" : "Histórica"} · {curveData.baseline.status}</p>
+            <TabsContent value="automatic" className="space-y-5">
+              <div className="flex flex-wrap items-end justify-end gap-3">
+                <ChartPreviewModal
+                  title="Curva S Semanal"
+                  description="Visualização ampliada da comparação entre baseline e execução atual."
+                  renderChart={renderCurveChart}
+                  expandedHeight={640}
+                />
+                <Select value={curveMetric} onValueChange={(value) => setCurveMetric(value as ProjectCurveSResponse["metric"])}>
+                  <SelectTrigger className="w-40">
+                    <SelectValue placeholder="Métrica" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="effort">Esforço</SelectItem>
+                    <SelectItem value="cost">Custo</SelectItem>
+                    <SelectItem value="progress">Progresso</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Select value={selectedBaselineId} onValueChange={setSelectedBaselineId}>
+                  <SelectTrigger className="w-64">
+                    <SelectValue placeholder="Baseline" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {baselines.length === 0 ? <SelectItem value="none" disabled>Sem baseline disponível</SelectItem> : baselines.map((baseline) => (
+                      <SelectItem key={baseline.id} value={String(baseline.id)}>
+                        LB {String(baseline.baselineNumber).padStart(2, "0")} · {baseline.baselineName}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
-              <div className="rounded-xl border border-border/70 bg-background/[0.60] p-4">
-                <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Planejado acumulado</p>
-                <p className="mt-2 text-sm font-medium text-foreground">{formatMetricValue(curveMetric, curveData.summary.plannedTotal)}</p>
-              </div>
-              <div className="rounded-xl border border-border/70 bg-background/[0.60] p-4">
-                <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Desvio acumulado</p>
-                <p className={`mt-2 text-sm font-medium ${curveData.summary.varianceTotal >= 0 ? "text-success" : "text-destructive"}`}>
-                  {formatMetricValue(curveMetric, curveData.summary.varianceTotal)}
-                </p>
-              </div>
-            </div>
-          ) : null}
 
-          {selectedBaselineId === "none" ? (
-            <div className="rounded-xl border border-dashed border-border/70 bg-background/40 p-6 text-sm text-muted-foreground">
-              Crie ou selecione uma baseline para visualizar a curva S semanal deste projeto.
-            </div>
-          ) : loadingCurve ? (
-            <div className="rounded-xl border border-dashed border-border/70 bg-background/40 p-6 text-sm text-muted-foreground">
-              Calculando curva S...
-            </div>
-          ) : curveData && curveData.points.length > 0 ? (
-            renderCurveChart(360)
-          ) : (
-            <div className="rounded-xl border border-dashed border-border/70 bg-background/40 p-6 text-sm text-muted-foreground">
-              Ainda não há dados suficientes para montar a curva S desta baseline.
-            </div>
-          )}
+              {curveData?.baseline ? (
+                <div className="grid gap-3 md:grid-cols-3">
+                  <div className="rounded-xl border border-border/70 bg-background/[0.60] p-4">
+                    <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Baseline em comparação</p>
+                    <p className="mt-2 text-sm font-medium text-foreground">{curveData.baseline.baselineName}</p>
+                    <p className="mt-1 text-xs text-muted-foreground">{curveData.baseline.isOfficial ? "Oficial" : "Histórica"} · {curveData.baseline.status}</p>
+                  </div>
+                  <div className="rounded-xl border border-border/70 bg-background/[0.60] p-4">
+                    <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Planejado acumulado</p>
+                    <p className="mt-2 text-sm font-medium text-foreground">{formatMetricValue(curveMetric, curveData.summary.plannedTotal)}</p>
+                  </div>
+                  <div className="rounded-xl border border-border/70 bg-background/[0.60] p-4">
+                    <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Desvio acumulado</p>
+                    <p className={`mt-2 text-sm font-medium ${curveData.summary.varianceTotal >= 0 ? "text-success" : "text-destructive"}`}>
+                      {formatMetricValue(curveMetric, curveData.summary.varianceTotal)}
+                    </p>
+                  </div>
+                </div>
+              ) : null}
+
+              {selectedBaselineId === "none" ? (
+                <div className="rounded-xl border border-dashed border-border/70 bg-background/40 p-6 text-sm text-muted-foreground">
+                  Crie ou selecione uma baseline para visualizar a curva S semanal deste projeto.
+                </div>
+              ) : loadingCurve ? (
+                <div className="rounded-xl border border-dashed border-border/70 bg-background/40 p-6 text-sm text-muted-foreground">
+                  Calculando curva S...
+                </div>
+              ) : curveData && curveData.points.length > 0 ? (
+                renderCurveChart(360)
+              ) : (
+                <div className="rounded-xl border border-dashed border-border/70 bg-background/40 p-6 text-sm text-muted-foreground">
+                  Ainda não há dados suficientes para montar a curva S desta baseline.
+                </div>
+              )}
+            </TabsContent>
+
+            <TabsContent value="manual" className="space-y-5">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <CalendarDays size={16} className="text-primary" />
+                    <h4 className="text-sm font-semibold text-foreground">Curva S manual</h4>
+                  </div>
+                  <p className="text-sm text-muted-foreground">Datas semanais do projeto, linhas base manuais, realizado e observações sucintas.</p>
+                </div>
+                <div className="flex flex-wrap justify-end gap-2">
+                  <ChartPreviewModal
+                    title="Curva S Manual"
+                    description="Visualização ampliada das linhas base manuais e do realizado."
+                    renderChart={renderManualCurveChart}
+                    expandedHeight={640}
+                  />
+                  {canWrite ? (
+                    <>
+                      <Button size="sm" variant="outline" disabled={savingManualCurve || !nextManualBaselineNumber} onClick={() => handleCreateManualSeries("baseline")} className="gap-1.5">
+                        <Plus size={14} /> Linha Base
+                      </Button>
+                      <Button size="sm" variant="outline" disabled={savingManualCurve || hasActualSeries} onClick={() => handleCreateManualSeries("actual")} className="gap-1.5">
+                        <Plus size={14} /> Realizado
+                      </Button>
+                      <Button size="sm" disabled={savingManualCurve || manualSeries.length === 0} onClick={handleSaveManualCurve} className="gap-1.5">
+                        <Save size={14} /> Salvar
+                      </Button>
+                    </>
+                  ) : null}
+                </div>
+              </div>
+
+              {loadingManualCurve ? (
+                <div className="rounded-xl border border-dashed border-border/70 bg-background/40 p-6 text-sm text-muted-foreground">
+                  Carregando Curva S manual...
+                </div>
+              ) : manualSeries.length === 0 ? (
+                <div className="rounded-xl border border-dashed border-border/70 bg-background/40 p-6 text-sm text-muted-foreground">
+                  Crie a Linha Base 1 e a série Realizado para iniciar a Curva S manual.
+                </div>
+              ) : (
+                <>
+                  {manualChartData.length > 0 ? renderManualCurveChart(320) : null}
+                  <div className="rounded-xl border border-border/80 bg-background/[0.50]">
+                    <div className="overflow-x-auto">
+                      <Table className="min-w-[980px]">
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead className="w-32">Data</TableHead>
+                            {manualSeries.map((series) => (
+                              <TableHead key={series.id} className="min-w-36">
+                                <div className="flex flex-col gap-1">
+                                  <span>{series.seriesName}</span>
+                                  <Badge variant={getManualStatusBadgeVariant(series.status)} className="w-fit">
+                                    {series.status === "approved" ? "Aprovada" : series.status === "pending_approval" ? "Pendente" : series.status === "draft" ? "Rascunho" : "Rejeitada"}
+                                  </Badge>
+                                </div>
+                              </TableHead>
+                            ))}
+                            <TableHead className="min-w-72">Observação</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {manualRows.map((date) => (
+                            <TableRow key={date}>
+                              <TableCell className="text-xs font-medium text-muted-foreground">{formatIsoDate(date)}</TableCell>
+                              {manualSeries.map((series) => (
+                                <TableCell key={`${series.id}:${date}`}>
+                                  <Input
+                                    type="number"
+                                    min={0}
+                                    max={100}
+                                    step="0.1"
+                                    disabled={!canWrite || series.status === "rejected"}
+                                    value={manualPointValues[`${series.id}:${date}`] || ""}
+                                    onChange={(event) => setManualPointValues((current) => ({ ...current, [`${series.id}:${date}`]: event.target.value }))}
+                                    className="h-9"
+                                  />
+                                </TableCell>
+                              ))}
+                              <TableCell>
+                                <Input
+                                  maxLength={manualCurve?.limits.observationMaxLength || 255}
+                                  disabled={!canWrite}
+                                  value={manualObservations[date] || ""}
+                                  onChange={(event) => setManualObservations((current) => ({ ...current, [date]: event.target.value.slice(0, manualCurve?.limits.observationMaxLength || 255) }))}
+                                  className="h-9"
+                                />
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  </div>
+
+                  {hasRole("admin") && manualSeries.some((series) => series.status === "pending_approval") ? (
+                    <div className="space-y-3 rounded-xl border border-border/80 bg-background/[0.50] p-4">
+                      <h4 className="text-sm font-medium text-foreground">Aprovação de linhas base manuais</h4>
+                      {manualSeries.filter((series) => series.status === "pending_approval").map((series) => (
+                        <div key={series.id} className="grid gap-2 rounded-lg border border-border/70 bg-card/60 p-3 md:grid-cols-[minmax(0,1fr)_auto]">
+                          <div className="min-w-0">
+                            <p className="font-medium text-foreground">{series.seriesName}</p>
+                            <p className="text-xs text-muted-foreground">Criada por {series.createdByName || "Sistema"} em {formatDateTime(series.createdAt)}</p>
+                            <Textarea
+                              className="mt-2 min-h-16"
+                              placeholder="Parecer do administrador"
+                              value={manualApprovalNotes[series.id] || ""}
+                              onChange={(event) => setManualApprovalNotes((current) => ({ ...current, [series.id]: event.target.value }))}
+                            />
+                          </div>
+                          <div className="flex items-end gap-2">
+                            <Button size="sm" onClick={() => handleApproveManualSeries(series.id)} className="gap-1.5"><Check size={14} /> Aprovar</Button>
+                            <Button size="sm" variant="outline" onClick={() => handleRejectManualSeries(series.id)} className="gap-1.5"><X size={14} /> Rejeitar</Button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : null}
+                </>
+              )}
+            </TabsContent>
+          </Tabs>
         </CardContent>
       </Card>
     </div>
