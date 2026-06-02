@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import ExcelJS from "exceljs";
 import type { Projeto } from "@/data/projectData";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
@@ -14,7 +15,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ResponsiveContainer, CartesianGrid, Legend, Line, LineChart, Tooltip, XAxis, YAxis } from "recharts";
 import { formatCurrency } from "@/contexts/DataContext";
-import { CalendarDays, Check, GitBranchPlus, Plus, Save, ShieldCheck, Trash2, X } from "lucide-react";
+import { CalendarDays, Check, FileDown, GitBranchPlus, Plus, Save, ShieldCheck, Trash2, Upload, X } from "lucide-react";
 import ChartPreviewModal from "@/components/ChartPreviewModal";
 
 interface BaselineGovernancePanelProps {
@@ -65,6 +66,48 @@ function normalizePercentInput(value: string) {
   return Math.min(100, Math.max(0, parsed));
 }
 
+function normalizeTemplatePercent(value: unknown) {
+  if (value == null || value === "") return "";
+  const raw = typeof value === "object" && value && "result" in value ? (value as { result: unknown }).result : value;
+  const parsed = Number(String(raw).replace(",", "."));
+  if (!Number.isFinite(parsed)) return "";
+  const percent = parsed > 0 && parsed <= 1 ? parsed * 100 : parsed;
+  return String(Math.min(100, Math.max(0, Number(percent.toFixed(2)))));
+}
+
+function normalizeTemplateDate(value: unknown) {
+  if (!value) return "";
+  if (value instanceof Date && !Number.isNaN(value.getTime())) return value.toISOString().slice(0, 10);
+  if (typeof value === "number" && value > 1 && value < 200000) {
+    const epoch = new Date(Date.UTC(1899, 11, 30));
+    return new Date(epoch.getTime() + value * 86400000).toISOString().slice(0, 10);
+  }
+  const raw = String(value).trim();
+  const date = new Date(raw);
+  if (!Number.isNaN(date.getTime())) return date.toISOString().slice(0, 10);
+  const slash = raw.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/);
+  if (!slash) return "";
+  let month = Number(slash[1]);
+  let day = Number(slash[2]);
+  let year = Number(slash[3]);
+  if (Number(slash[1]) > 12) {
+    day = Number(slash[1]);
+    month = Number(slash[2]);
+  }
+  if (year < 100) year += 2000;
+  const parsed = new Date(Date.UTC(year, month - 1, day));
+  return Number.isNaN(parsed.getTime()) ? "" : parsed.toISOString().slice(0, 10);
+}
+
+function normalizeTemplateHeader(value: unknown) {
+  return String(value || "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 const MANUAL_CURVE_COLORS = [
   "hsl(217, 91%, 60%)",
   "hsl(262, 83%, 68%)",
@@ -82,6 +125,7 @@ const MANUAL_CURVE_COLORS = [
 export default function BaselineGovernancePanel({ selectedProject }: BaselineGovernancePanelProps) {
   const { canWrite, hasRole } = useAuth();
   const { toast } = useToast();
+  const manualImportInputRef = useRef<HTMLInputElement | null>(null);
   const [curveMetric, setCurveMetric] = useState<ProjectCurveSResponse["metric"]>("effort");
   const [selectedBaselineId, setSelectedBaselineId] = useState("none");
   const [baselineName, setBaselineName] = useState("");
@@ -425,6 +469,118 @@ export default function BaselineGovernancePanel({ selectedProject }: BaselineGov
     }
   }
 
+  async function handleImportManualCurveTemplate(file?: File | null) {
+    if (!selectedProject || !file) return;
+    setSavingManualCurve(true);
+    try {
+      const workbook = new ExcelJS.Workbook();
+      await workbook.xlsx.load(await file.arrayBuffer());
+      const sheet = workbook.worksheets.find((item) => item.rowCount > 0);
+      if (!sheet) throw new Error("Planilha sem dados para importar");
+
+      const headers = sheet.getRow(1).values as unknown[];
+      const dataColumn = headers.findIndex((header) => normalizeTemplateHeader(header) === "data");
+      if (dataColumn <= 0) throw new Error("Coluna data é obrigatória no template");
+
+      const baselineColumns: Array<{ column: number; baselineNumber: number; label: string }> = [];
+      let actualColumn = 0;
+      let observationColumn = 0;
+      headers.forEach((header, index) => {
+        const normalized = normalizeTemplateHeader(header);
+        const baselineMatch = normalized.match(/^linha base (\d+)$/);
+        if (baselineMatch) {
+          const baselineNumber = Number(baselineMatch[1]);
+          if (baselineNumber >= 1 && baselineNumber <= (manualCurve?.limits.maxBaselines || 10)) {
+            baselineColumns.push({ column: index, baselineNumber, label: String(header || `Linha Base ${baselineNumber}`) });
+          }
+        }
+        if (["real", "realizado"].includes(normalized)) actualColumn = index;
+        if (["obs", "observacao"].includes(normalized)) observationColumn = index;
+      });
+
+      if (!baselineColumns.length && !actualColumn) throw new Error("Informe ao menos uma Linha Base ou Realizado no template");
+
+      const rows: Array<{ date: string; values: Record<number, string>; actual?: string; observation: string }> = [];
+      for (let rowIndex = 2; rowIndex <= sheet.rowCount; rowIndex += 1) {
+        const row = sheet.getRow(rowIndex);
+        const date = normalizeTemplateDate(row.getCell(dataColumn).value);
+        if (!date) continue;
+        const values: Record<number, string> = {};
+        baselineColumns.forEach((item) => {
+          const percent = normalizeTemplatePercent(row.getCell(item.column).value);
+          if (percent !== "") values[item.baselineNumber] = percent;
+        });
+        const actual = actualColumn ? normalizeTemplatePercent(row.getCell(actualColumn).value) : "";
+        const observation = observationColumn ? String(row.getCell(observationColumn).text || row.getCell(observationColumn).value || "").slice(0, manualCurve?.limits.observationMaxLength || 255) : "";
+        rows.push({ date, values, actual: actual || undefined, observation });
+      }
+      if (!rows.length) throw new Error("Nenhuma data válida encontrada no template");
+
+      let response = manualCurve || await api.getManualCurveS(selectedProject.id);
+      const ensureSeries = async (seriesType: api.ManualCurveSSeries["seriesType"], baselineNumber: number, seriesName: string) => {
+        const existing = response.series.find((series) => series.seriesType === seriesType && series.baselineNumber === baselineNumber);
+        if (existing) return existing;
+        const created = await api.createManualCurveSSeries({ projectId: selectedProject.id, seriesType, baselineNumber, seriesName, justification: "Importação do template Curva S" });
+        response = await api.getManualCurveS(selectedProject.id);
+        return created;
+      };
+
+      for (const column of baselineColumns) {
+        const series = await ensureSeries("baseline", column.baselineNumber, `Linha Base ${column.baselineNumber}`);
+        await api.saveManualCurveSPoints(series.id, rows.map((row) => ({ date: row.date, percent: normalizePercentInput(row.values[column.baselineNumber] || "0") })));
+      }
+      if (actualColumn) {
+        const actualSeries = await ensureSeries("actual", 0, "Realizado");
+        await api.saveManualCurveSPoints(actualSeries.id, rows.map((row) => ({ date: row.date, percent: normalizePercentInput(row.actual || "0") })));
+      }
+      await api.saveManualCurveSObservations(selectedProject.id, rows.map((row) => ({ date: row.date, observation: row.observation })));
+      toast({ title: "Template da Curva S importado" });
+      await reloadManualCurve();
+    } catch (error) {
+      toast({ title: "Erro ao importar Curva S", description: (error as Error).message, variant: "destructive" });
+    } finally {
+      setSavingManualCurve(false);
+      if (manualImportInputRef.current) manualImportInputRef.current.value = "";
+    }
+  }
+
+  async function handleExportManualCurveTemplate() {
+    if (!selectedProject) return;
+    const workbook = new ExcelJS.Workbook();
+    const sheet = workbook.addWorksheet("Curva S");
+    const baselineSeries = manualSeries.filter((series) => series.seriesType === "baseline");
+    const actualSeries = manualSeries.find((series) => series.seriesType === "actual");
+    sheet.addRow([
+      "data",
+      ...baselineSeries.map((series) => `Linha Base ${series.baselineNumber}`),
+      "Real",
+      "OBS",
+    ]);
+    manualRows.forEach((date) => {
+      sheet.addRow([
+        date,
+        ...baselineSeries.map((series) => normalizePercentInput(manualPointValues[`${series.id}:${date}`] || "0") / 100),
+        actualSeries ? normalizePercentInput(manualPointValues[`${actualSeries.id}:${date}`] || "0") / 100 : 0,
+        manualObservations[date] || "",
+      ]);
+    });
+    sheet.getColumn(1).numFmt = "dd/mm/yyyy";
+    for (let columnIndex = 2; columnIndex <= sheet.columnCount - 1; columnIndex += 1) {
+      sheet.getColumn(columnIndex).numFmt = "0.00%";
+    }
+    sheet.columns.forEach((column) => {
+      column.width = column.number === sheet.columnCount ? 42 : 18;
+    });
+    const buffer = await workbook.xlsx.writeBuffer();
+    const blob = new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `curva-s-${selectedProject.projeto.replace(/[^a-z0-9]+/gi, "-").toLowerCase()}.xlsx`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
   if (!selectedProject) {
     return (
       <Card className="border-border/80 bg-card/[0.92] shadow-[0_18px_40px_-32px_rgba(15,23,42,0.42)]">
@@ -708,6 +864,19 @@ export default function BaselineGovernancePanel({ selectedProject }: BaselineGov
                   />
                   {canWrite ? (
                     <>
+                      <input
+                        ref={manualImportInputRef}
+                        type="file"
+                        accept=".xlsx,.xlsm"
+                        className="hidden"
+                        onChange={(event) => handleImportManualCurveTemplate(event.target.files?.[0])}
+                      />
+                      <Button size="sm" variant="outline" disabled={savingManualCurve} onClick={() => manualImportInputRef.current?.click()} className="gap-1.5">
+                        <Upload size={14} /> Importar
+                      </Button>
+                      <Button size="sm" variant="outline" disabled={savingManualCurve || manualRows.length === 0} onClick={handleExportManualCurveTemplate} className="gap-1.5">
+                        <FileDown size={14} /> Exportar
+                      </Button>
                       <Input
                         type="date"
                         value={newManualDate}
