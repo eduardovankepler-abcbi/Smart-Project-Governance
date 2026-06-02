@@ -378,6 +378,56 @@ async function rejectManualCurveSeries(pool, seriesId, actor, approvalNotes = ""
   return mapSeries(updated[0]);
 }
 
+async function deleteManualCurveSeries(pool, seriesId, actor) {
+  const normalizedSeriesId = sanitizeInt(seriesId);
+  if (!normalizedSeriesId) throw createError(400, "Série é obrigatória", "CURVE_S_SERIES_REQUIRED");
+  const [rows] = await pool.query("SELECT * FROM project_curve_s_series WHERE id = ? LIMIT 1", [normalizedSeriesId]);
+  if (!rows.length) throw createError(404, "Série da Curva S não encontrada", "CURVE_S_SERIES_NOT_FOUND");
+  const current = rows[0];
+
+  await pool.query("DELETE FROM project_curve_s_series WHERE id = ?", [current.id]);
+  await logAudit(pool, {
+    actor,
+    action: "delete",
+    entityType: "manual_curve_s_series",
+    entityId: String(current.id),
+    projectId: current.project_id,
+    summary: `Série manual da Curva S excluída: ${current.series_name}`,
+    before: current,
+  });
+  return { deleted: true, id: current.id };
+}
+
+async function deleteManualCurveDate(pool, { projectId, date, actor }) {
+  const project = await getProjectOrThrow(pool, projectId);
+  const normalizedDate = normalizeDateInput(date);
+  if (!normalizedDate) throw createError(400, "Data é obrigatória", "CURVE_S_DATE_REQUIRED");
+
+  const connection = await pool.getConnection();
+  try {
+    await connection.beginTransaction();
+    await connection.query("DELETE FROM project_curve_s_points WHERE project_id = ? AND curve_date = ?", [project.id, normalizedDate]);
+    await connection.query("DELETE FROM project_curve_s_observations WHERE project_id = ? AND curve_date = ?", [project.id, normalizedDate]);
+    await connection.commit();
+  } catch (error) {
+    await connection.rollback();
+    throw error;
+  } finally {
+    connection.release();
+  }
+
+  await logAudit(pool, {
+    actor,
+    action: "delete",
+    entityType: "manual_curve_s_date",
+    entityId: `${project.id}:${normalizedDate}`,
+    projectId: project.id,
+    summary: `Data removida da Curva S manual: ${normalizedDate}`,
+    before: { projectId: project.id, date: normalizedDate },
+  });
+  return { deleted: true, projectId: project.id, date: normalizedDate };
+}
+
 module.exports = {
   SERIES_TYPES,
   SERIES_STATUSES,
@@ -395,4 +445,6 @@ module.exports = {
   upsertManualCurveObservations,
   approveManualCurveSeries,
   rejectManualCurveSeries,
+  deleteManualCurveSeries,
+  deleteManualCurveDate,
 };

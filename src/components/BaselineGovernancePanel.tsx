@@ -14,7 +14,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ResponsiveContainer, CartesianGrid, Legend, Line, LineChart, Tooltip, XAxis, YAxis } from "recharts";
 import { formatCurrency } from "@/contexts/DataContext";
-import { CalendarDays, Check, GitBranchPlus, Plus, Save, ShieldCheck, X } from "lucide-react";
+import { CalendarDays, Check, GitBranchPlus, Plus, Save, ShieldCheck, Trash2, X } from "lucide-react";
 import ChartPreviewModal from "@/components/ChartPreviewModal";
 
 interface BaselineGovernancePanelProps {
@@ -94,6 +94,8 @@ export default function BaselineGovernancePanel({ selectedProject }: BaselineGov
   const [manualPointValues, setManualPointValues] = useState<Record<string, string>>({});
   const [manualObservations, setManualObservations] = useState<Record<string, string>>({});
   const [manualApprovalNotes, setManualApprovalNotes] = useState<Record<number, string>>({});
+  const [manualCustomDates, setManualCustomDates] = useState<string[]>([]);
+  const [newManualDate, setNewManualDate] = useState("");
   const [loadingBaselines, setLoadingBaselines] = useState(false);
   const [loadingCurve, setLoadingCurve] = useState(false);
   const [loadingManualCurve, setLoadingManualCurve] = useState(false);
@@ -119,10 +121,11 @@ export default function BaselineGovernancePanel({ selectedProject }: BaselineGov
   const manualRows = useMemo(() => {
     if (!manualCurve) return [];
     const dates = new Set<string>(manualCurve.defaultDates);
+    manualCustomDates.forEach((date) => dates.add(date));
     manualCurve.points.forEach((point) => point.date && dates.add(point.date));
     manualCurve.observations.forEach((item) => item.date && dates.add(item.date));
     return Array.from(dates).sort();
-  }, [manualCurve]);
+  }, [manualCurve, manualCustomDates]);
   const manualChartData = useMemo(() => {
     return manualRows.map((date) => {
       const row: Record<string, string | number> = { date, label: formatIsoDate(date) };
@@ -205,6 +208,7 @@ export default function BaselineGovernancePanel({ selectedProject }: BaselineGov
       try {
         const response = await api.getManualCurveS(selectedProject.id);
         setManualCurve(response);
+        setManualCustomDates([]);
         const points: Record<string, string> = {};
         response.points.forEach((point) => {
           if (point.seriesId && point.date) points[`${point.seriesId}:${point.date}`] = String(point.percent ?? 0);
@@ -228,6 +232,7 @@ export default function BaselineGovernancePanel({ selectedProject }: BaselineGov
     if (!selectedProject) return;
     const response = await api.getManualCurveS(selectedProject.id);
     setManualCurve(response);
+    setManualCustomDates([]);
     const points: Record<string, string> = {};
     response.points.forEach((point) => {
       if (point.seriesId && point.date) points[`${point.seriesId}:${point.date}`] = String(point.percent ?? 0);
@@ -373,6 +378,50 @@ export default function BaselineGovernancePanel({ selectedProject }: BaselineGov
       await reloadManualCurve();
     } catch (error) {
       toast({ title: "Erro", description: (error as Error).message, variant: "destructive" });
+    }
+  }
+
+  function handleAddManualDate() {
+    if (!newManualDate) return;
+    setManualCustomDates((current) => Array.from(new Set([...current, newManualDate])).sort());
+    setNewManualDate("");
+  }
+
+  async function handleDeleteManualDate(date: string) {
+    if (!selectedProject) return;
+    setSavingManualCurve(true);
+    try {
+      await api.deleteManualCurveSDate(selectedProject.id, date);
+      setManualCustomDates((current) => current.filter((item) => item !== date));
+      setManualPointValues((current) => {
+        const next = { ...current };
+        manualSeries.forEach((series) => delete next[`${series.id}:${date}`]);
+        return next;
+      });
+      setManualObservations((current) => {
+        const next = { ...current };
+        delete next[date];
+        return next;
+      });
+      toast({ title: "Data removida da Curva S" });
+      await reloadManualCurve();
+    } catch (error) {
+      toast({ title: "Erro", description: (error as Error).message, variant: "destructive" });
+    } finally {
+      setSavingManualCurve(false);
+    }
+  }
+
+  async function handleDeleteManualSeries(seriesId: number) {
+    setSavingManualCurve(true);
+    try {
+      await api.deleteManualCurveSSeries(seriesId);
+      toast({ title: "Série removida da Curva S" });
+      await reloadManualCurve();
+    } catch (error) {
+      toast({ title: "Erro", description: (error as Error).message, variant: "destructive" });
+    } finally {
+      setSavingManualCurve(false);
     }
   }
 
@@ -659,6 +708,15 @@ export default function BaselineGovernancePanel({ selectedProject }: BaselineGov
                   />
                   {canWrite ? (
                     <>
+                      <Input
+                        type="date"
+                        value={newManualDate}
+                        onChange={(event) => setNewManualDate(event.target.value)}
+                        className="h-9 w-40"
+                      />
+                      <Button size="sm" variant="outline" disabled={savingManualCurve || !newManualDate} onClick={handleAddManualDate} className="gap-1.5">
+                        <CalendarDays size={14} /> Data
+                      </Button>
                       <Button size="sm" variant="outline" disabled={savingManualCurve || !nextManualBaselineNumber} onClick={() => handleCreateManualSeries("baseline")} className="gap-1.5">
                         <Plus size={14} /> Linha Base
                       </Button>
@@ -689,14 +747,28 @@ export default function BaselineGovernancePanel({ selectedProject }: BaselineGov
                       <Table className="min-w-[980px]">
                         <TableHeader>
                           <TableRow>
-                            <TableHead className="w-32">Data</TableHead>
+                            <TableHead className="w-40">Data</TableHead>
                             {manualSeries.map((series) => (
                               <TableHead key={series.id} className="min-w-36">
-                                <div className="flex flex-col gap-1">
-                                  <span>{series.seriesName}</span>
-                                  <Badge variant={getManualStatusBadgeVariant(series.status)} className="w-fit">
-                                    {series.status === "approved" ? "Aprovada" : series.status === "pending_approval" ? "Pendente" : series.status === "draft" ? "Rascunho" : "Rejeitada"}
-                                  </Badge>
+                                <div className="flex items-start justify-between gap-2">
+                                  <div className="flex min-w-0 flex-col gap-1">
+                                    <span className="truncate">{series.seriesName}</span>
+                                    <Badge variant={getManualStatusBadgeVariant(series.status)} className="w-fit">
+                                      {series.status === "approved" ? "Aprovada" : series.status === "pending_approval" ? "Pendente" : series.status === "draft" ? "Rascunho" : "Rejeitada"}
+                                    </Badge>
+                                  </div>
+                                  {canWrite ? (
+                                    <Button
+                                      size="icon"
+                                      variant="ghost"
+                                      className="h-7 w-7 shrink-0 text-destructive"
+                                      title="Excluir série"
+                                      onClick={() => handleDeleteManualSeries(series.id)}
+                                      disabled={savingManualCurve}
+                                    >
+                                      <Trash2 size={13} />
+                                    </Button>
+                                  ) : null}
                                 </div>
                               </TableHead>
                             ))}
@@ -706,7 +778,23 @@ export default function BaselineGovernancePanel({ selectedProject }: BaselineGov
                         <TableBody>
                           {manualRows.map((date) => (
                             <TableRow key={date}>
-                              <TableCell className="text-xs font-medium text-muted-foreground">{formatIsoDate(date)}</TableCell>
+                              <TableCell className="text-xs font-medium text-muted-foreground">
+                                <div className="flex items-center justify-between gap-2">
+                                  <span>{formatIsoDate(date)}</span>
+                                  {canWrite ? (
+                                    <Button
+                                      size="icon"
+                                      variant="ghost"
+                                      className="h-7 w-7 text-destructive"
+                                      title="Remover data"
+                                      onClick={() => handleDeleteManualDate(date)}
+                                      disabled={savingManualCurve}
+                                    >
+                                      <Trash2 size={13} />
+                                    </Button>
+                                  ) : null}
+                                </div>
+                              </TableCell>
                               {manualSeries.map((series) => (
                                 <TableCell key={`${series.id}:${date}`}>
                                   <Input

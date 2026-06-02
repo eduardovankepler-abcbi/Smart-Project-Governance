@@ -4,6 +4,7 @@ const {
   generateProjectWeeklyDates,
   generateWeeklyDates,
   normalizePercent,
+  MAX_BASELINES,
 } = require("../utils/manualCurveS");
 
 test("generateWeeklyDates creates one point for each Monday in project range", () => {
@@ -35,4 +36,8 @@ test("normalizePercent accepts template decimal values and clamps range", () => 
   assert.equal(normalizePercent("65"), 65);
   assert.equal(normalizePercent("-10"), 0);
   assert.equal(normalizePercent("140"), 100);
+});
+
+test("manual curve supports ten baseline slots", () => {
+  assert.equal(MAX_BASELINES, 10);
 });

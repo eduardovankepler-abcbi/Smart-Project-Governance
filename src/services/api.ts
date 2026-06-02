@@ -553,6 +553,17 @@ export async function rejectManualCurveSSeries(id: number, approvalNotes?: strin
   });
 }
 
+export async function deleteManualCurveSSeries(id: number): Promise<{ deleted: boolean; id: number }> {
+  if (!isApiEnabled()) throw new Error("API não configurada");
+  return fetchJson<{ deleted: boolean; id: number }>(`/api/curve-s-manual/series/${id}`, { method: "DELETE" });
+}
+
+export async function deleteManualCurveSDate(projectId: number, date: string): Promise<{ deleted: boolean; projectId: number; date: string }> {
+  if (!isApiEnabled()) throw new Error("API não configurada");
+  const query = new URLSearchParams({ projectId: String(projectId), date });
+  return fetchJson<{ deleted: boolean; projectId: number; date: string }>(`/api/curve-s-manual/dates?${query.toString()}`, { method: "DELETE" });
+}
+
 // ===== PROJECT TEMPLATES =====
 export async function getProjectTemplates(): Promise<ProjectTemplate[]> {
   if (!isApiEnabled()) return [];

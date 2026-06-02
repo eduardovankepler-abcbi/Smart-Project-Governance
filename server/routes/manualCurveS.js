@@ -4,6 +4,8 @@ const { sanitizeInt, sanitizeString } = require("../utils/parsing");
 const {
   approveManualCurveSeries,
   createManualCurveSeries,
+  deleteManualCurveDate,
+  deleteManualCurveSeries,
   generateProjectWeeklyDates,
   listManualCurveS,
   rejectManualCurveSeries,
@@ -130,6 +132,31 @@ module.exports = function (pool, auth) {
     } catch (error) {
       console.error("Error rejecting manual S-curve series:", error);
       res.status(error.status || 500).json({ error: error.message || "Erro ao rejeitar linha base da Curva S", code: error.code || "REJECT_MANUAL_CURVE_S_SERIES" });
+    }
+  });
+
+  router.delete("/series/:id", requireAuth, requireWriteAccess, async (req, res) => {
+    try {
+      const projectId = await loadSeriesProjectId(req.params.id);
+      if (!projectId) return res.status(404).json({ error: "Série da Curva S não encontrada", code: "CURVE_S_SERIES_NOT_FOUND" });
+      await ensureProjectAccess(req.authUser, projectId);
+      res.json(await deleteManualCurveSeries(pool, req.params.id, req.authUser));
+    } catch (error) {
+      console.error("Error deleting manual S-curve series:", error);
+      res.status(error.status || 500).json({ error: error.message || "Erro ao excluir série da Curva S", code: error.code || "DELETE_MANUAL_CURVE_S_SERIES" });
+    }
+  });
+
+  router.delete("/dates", requireAuth, requireWriteAccess, async (req, res) => {
+    try {
+      const projectId = sanitizeInt(req.query.projectId);
+      const date = sanitizeString(req.query.date, 20);
+      if (!projectId) return res.status(400).json({ error: "Projeto é obrigatório", code: "CURVE_S_PROJECT_REQUIRED" });
+      await ensureProjectAccess(req.authUser, projectId);
+      res.json(await deleteManualCurveDate(pool, { projectId, date, actor: req.authUser }));
+    } catch (error) {
+      console.error("Error deleting manual S-curve date:", error);
+      res.status(error.status || 500).json({ error: error.message || "Erro ao excluir data da Curva S", code: error.code || "DELETE_MANUAL_CURVE_S_DATE" });
     }
   });
 
