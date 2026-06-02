@@ -55,6 +55,56 @@ export interface ProjectCurveSResponse {
   };
 }
 
+export interface ManualCurveSSeries {
+  id: number;
+  projectId: number;
+  seriesType: "baseline" | "actual";
+  baselineNumber: number;
+  seriesName: string;
+  status: "draft" | "pending_approval" | "approved" | "rejected";
+  isOfficial: boolean;
+  justification: string;
+  approvalNotes: string;
+  createdByUserId?: number;
+  createdByName: string;
+  createdByRole: string;
+  approvedByUserId?: number;
+  approvedByName: string;
+  approvedAt?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface ManualCurveSPoint {
+  id?: number;
+  seriesId?: number;
+  projectId?: number;
+  date: string;
+  percent: number;
+}
+
+export interface ManualCurveSObservation {
+  id?: number;
+  projectId?: number;
+  date: string;
+  observation: string;
+  createdByUserId?: number;
+  createdByName?: string;
+}
+
+export interface ManualCurveSResponse {
+  projectId: number;
+  projectName: string;
+  defaultDates: string[];
+  series: ManualCurveSSeries[];
+  points: ManualCurveSPoint[];
+  observations: ManualCurveSObservation[];
+  limits: {
+    maxBaselines: number;
+    observationMaxLength: number;
+  };
+}
+
 export interface ProjectTemplate {
   id: number;
   templateCode: string;
@@ -436,6 +486,71 @@ export async function getProjectCurveS(params: {
   if (params.baselineId) query.set("baselineId", String(params.baselineId));
   if (params.metric) query.set("metric", params.metric);
   return fetchJson<ProjectCurveSResponse>(`/api/baselines/curve-s?${query.toString()}`);
+}
+
+export async function getManualCurveS(projectId: number): Promise<ManualCurveSResponse> {
+  if (!isApiEnabled()) {
+    return {
+      projectId,
+      projectName: "",
+      defaultDates: [],
+      series: [],
+      points: [],
+      observations: [],
+      limits: { maxBaselines: 10, observationMaxLength: 255 },
+    };
+  }
+  const query = new URLSearchParams({ projectId: String(projectId) });
+  return fetchJson<ManualCurveSResponse>(`/api/curve-s-manual?${query.toString()}`);
+}
+
+export async function getManualCurveSWeeks(projectId: number): Promise<{ projectId: number; dates: string[] }> {
+  if (!isApiEnabled()) return { projectId, dates: [] };
+  const query = new URLSearchParams({ projectId: String(projectId) });
+  return fetchJson<{ projectId: number; dates: string[] }>(`/api/curve-s-manual/weeks?${query.toString()}`);
+}
+
+export async function createManualCurveSSeries(data: {
+  projectId: number;
+  seriesType?: ManualCurveSSeries["seriesType"];
+  baselineNumber?: number;
+  seriesName?: string;
+  justification?: string;
+}): Promise<ManualCurveSSeries> {
+  if (!isApiEnabled()) throw new Error("API não configurada");
+  return fetchJson<ManualCurveSSeries>("/api/curve-s-manual/series", { method: "POST", body: JSON.stringify(data) });
+}
+
+export async function saveManualCurveSPoints(seriesId: number, points: Array<{ date: string; percent: number }>): Promise<ManualCurveSPoint[]> {
+  if (!isApiEnabled()) throw new Error("API não configurada");
+  return fetchJson<ManualCurveSPoint[]>(`/api/curve-s-manual/series/${seriesId}/points`, {
+    method: "PUT",
+    body: JSON.stringify({ points }),
+  });
+}
+
+export async function saveManualCurveSObservations(projectId: number, observations: Array<{ date: string; observation: string }>): Promise<ManualCurveSObservation[]> {
+  if (!isApiEnabled()) throw new Error("API não configurada");
+  return fetchJson<ManualCurveSObservation[]>("/api/curve-s-manual/observations", {
+    method: "PUT",
+    body: JSON.stringify({ projectId, observations }),
+  });
+}
+
+export async function approveManualCurveSSeries(id: number, approvalNotes?: string): Promise<ManualCurveSSeries> {
+  if (!isApiEnabled()) throw new Error("API não configurada");
+  return fetchJson<ManualCurveSSeries>(`/api/curve-s-manual/series/${id}/approve`, {
+    method: "POST",
+    body: JSON.stringify({ approvalNotes }),
+  });
+}
+
+export async function rejectManualCurveSSeries(id: number, approvalNotes?: string): Promise<ManualCurveSSeries> {
+  if (!isApiEnabled()) throw new Error("API não configurada");
+  return fetchJson<ManualCurveSSeries>(`/api/curve-s-manual/series/${id}/reject`, {
+    method: "POST",
+    body: JSON.stringify({ approvalNotes }),
+  });
 }
 
 // ===== PROJECT TEMPLATES =====

@@ -41,6 +41,9 @@ async function dropExistingBootstrapTables(connection) {
   const tables = [
     "development_plan_items",
     "development_plans",
+    "project_curve_s_observations",
+    "project_curve_s_points",
+    "project_curve_s_series",
     "project_template_tasks",
     "project_templates",
     "project_baseline_tasks",
