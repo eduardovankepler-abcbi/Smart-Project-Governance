@@ -366,11 +366,125 @@ function TaskCard({ task, allTasks, projects, onExpand }: { task: Tarefa; allTas
   );
 }
 
+function KanbanBoard({
+  columns,
+  allTasks,
+  projects,
+  onExpandTask,
+  expanded = false,
+}: {
+  columns: KanbanColumn[];
+  allTasks: Tarefa[];
+  projects: Projeto[];
+  onExpandTask: (task: Tarefa) => void;
+  expanded?: boolean;
+}) {
+  return (
+    <div className="overflow-x-auto pb-2">
+      <div className={`grid grid-cols-6 gap-3 ${expanded ? "min-w-[1560px]" : "min-w-[1320px]"}`}>
+        {columns.map((column) => {
+          const Icon = column.icon;
+          return (
+            <section
+              key={column.id}
+              className={`flex flex-col rounded-lg border border-border bg-muted/30 ${expanded ? "max-h-[calc(96vh-170px)] min-h-[620px]" : "max-h-[calc(100vh-230px)] min-h-[540px]"}`}
+            >
+              <div className="flex items-center justify-between gap-3 border-b border-border px-3 py-3">
+                <div className="flex items-center gap-2">
+                  <span className={`h-2.5 w-2.5 rounded-full ${column.tone}`} />
+                  <h3 className="text-sm font-semibold uppercase tracking-wide text-foreground">{column.title}</h3>
+                </div>
+                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <Icon size={14} />
+                  <span>{column.tasks.length}</span>
+                </div>
+              </div>
+              <div className={`min-h-0 flex-1 space-y-3 overflow-y-auto ${expanded ? "p-4" : "p-3"}`}>
+                {column.tasks.map((task) => (
+                  <TaskCard key={task.id} task={task} allTasks={allTasks} projects={projects} onExpand={onExpandTask} />
+                ))}
+                {column.tasks.length === 0 ? (
+                  <div className="rounded-lg border border-dashed border-border p-4 text-center text-xs text-muted-foreground">
+                    Nenhuma tarefa nesta coluna.
+                  </div>
+                ) : null}
+              </div>
+            </section>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function BoardExpansionModal({
+  open,
+  onOpenChange,
+  project,
+  columns,
+  allTasks,
+  projects,
+  resourceNames,
+  blockedCount,
+  onExpandTask,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  project?: Projeto;
+  columns: KanbanColumn[];
+  allTasks: Tarefa[];
+  projects: Projeto[];
+  resourceNames: string[];
+  blockedCount: number;
+  onExpandTask: (task: Tarefa) => void;
+}) {
+  const taskCount = columns.reduce((total, column) => total + column.tasks.length, 0);
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="flex h-[96vh] max-h-[96vh] w-[98vw] max-w-[98vw] flex-col gap-4 overflow-hidden border-border/90 bg-background p-5 shadow-2xl">
+        <DialogHeader className="pr-8">
+          <DialogDescription className="text-[11px] font-semibold uppercase tracking-[0.22em] text-muted-foreground">
+            Quadro expandido
+          </DialogDescription>
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div className="min-w-0">
+              <DialogTitle className="break-words text-2xl font-display leading-tight">
+                {project?.projeto || "Selecione um projeto"}
+              </DialogTitle>
+              <div className="mt-2 flex flex-wrap gap-2">
+                <Badge variant={blockedCount > 0 ? "destructive" : "secondary"}>{blockedCount} bloqueada(s)</Badge>
+                <Badge variant="outline">{taskCount} tarefa(s)</Badge>
+                <Badge variant="outline">{columns.length} coluna(s)</Badge>
+              </div>
+            </div>
+            <div className="flex -space-x-2 pr-6">
+              {resourceNames.map((name, index) => <ResourceAvatar key={name} name={name} index={index} />)}
+              {resourceNames.length === 0 ? <span className="text-xs text-muted-foreground">Sem recursos alocados</span> : null}
+            </div>
+          </div>
+        </DialogHeader>
+
+        <div className="min-h-0 flex-1 overflow-hidden">
+          <KanbanBoard
+            columns={columns}
+            allTasks={allTasks}
+            projects={projects}
+            onExpandTask={onExpandTask}
+            expanded
+          />
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 export default function KanbanPage() {
   const { projetos, tarefas, getUniqueProjetos } = useData();
   const projectNames = useMemo(() => getUniqueProjetos(), [getUniqueProjetos]);
   const [selectedProjectName, setSelectedProjectName] = useState(projectNames[0] || "");
   const [expandedTask, setExpandedTask] = useState<Tarefa | null>(null);
+  const [boardExpanded, setBoardExpanded] = useState(false);
 
   const selectedProject = useMemo(
     () => projetos.find((project) => project.projeto === selectedProjectName) || projetos[0],
@@ -407,6 +521,10 @@ export default function KanbanPage() {
               {resourceNames.map((name, index) => <ResourceAvatar key={name} name={name} index={index} />)}
               {resourceNames.length === 0 ? <span className="text-xs text-muted-foreground">Sem recursos alocados</span> : null}
             </div>
+            <Button variant="outline" className="gap-2" onClick={() => setBoardExpanded(true)}>
+              <Maximize2 size={15} />
+              Expandir quadro
+            </Button>
             <Select value={selectedProject?.projeto || ""} onValueChange={setSelectedProjectName}>
               <SelectTrigger className="w-72">
                 <SelectValue placeholder="Projeto" />
@@ -418,38 +536,19 @@ export default function KanbanPage() {
           </div>
         </div>
 
-        <div className="overflow-x-auto pb-2">
-          <div className="grid min-w-[1320px] grid-cols-6 gap-3">
-            {columns.map((column) => {
-              const Icon = column.icon;
-              return (
-                <section key={column.id} className="flex max-h-[calc(100vh-230px)] min-h-[540px] flex-col rounded-lg border border-border bg-muted/30">
-                  <div className="flex items-center justify-between gap-3 border-b border-border px-3 py-3">
-                    <div className="flex items-center gap-2">
-                      <span className={`h-2.5 w-2.5 rounded-full ${column.tone}`} />
-                      <h3 className="text-sm font-semibold uppercase tracking-wide text-foreground">{column.title}</h3>
-                    </div>
-                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                      <Icon size={14} />
-                      <span>{column.tasks.length}</span>
-                    </div>
-                  </div>
-                  <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-3">
-                    {column.tasks.map((task) => (
-                      <TaskCard key={task.id} task={task} allTasks={tarefas} projects={projetos} onExpand={setExpandedTask} />
-                    ))}
-                    {column.tasks.length === 0 ? (
-                      <div className="rounded-lg border border-dashed border-border p-4 text-center text-xs text-muted-foreground">
-                        Nenhuma tarefa nesta coluna.
-                      </div>
-                    ) : null}
-                  </div>
-                </section>
-              );
-            })}
-          </div>
-        </div>
+        <KanbanBoard columns={columns} allTasks={tarefas} projects={projetos} onExpandTask={setExpandedTask} />
       </div>
+      <BoardExpansionModal
+        open={boardExpanded}
+        onOpenChange={setBoardExpanded}
+        project={selectedProject}
+        columns={columns}
+        allTasks={tarefas}
+        projects={projetos}
+        resourceNames={resourceNames}
+        blockedCount={blockedCount}
+        onExpandTask={setExpandedTask}
+      />
       <TaskExpansionModal
         task={expandedTask}
         allTasks={tarefas}
