@@ -126,6 +126,8 @@ function normalizeDateInput(val) {
   const isoMatch = raw.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
   if (isoMatch) {
     const [, year, month, day] = isoMatch;
+    const parsed = new Date(Date.UTC(Number(year), Number(month) - 1, Number(day)));
+    if (Number.isNaN(parsed.getTime()) || parsed.getUTCFullYear() !== Number(year) || parsed.getUTCMonth() !== Number(month) - 1 || parsed.getUTCDate() !== Number(day)) return "";
     return `${year}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`;
   }
 
@@ -160,6 +162,8 @@ function normalizeDateInput(val) {
 
   if (year < 100) year += 2000;
   if (month < 1 || month > 12 || day < 1 || day > 31) return "";
+  const parsed = new Date(Date.UTC(year, month - 1, day));
+  if (Number.isNaN(parsed.getTime()) || parsed.getUTCFullYear() !== year || parsed.getUTCMonth() !== month - 1 || parsed.getUTCDate() !== day) return "";
   return `${String(year).padStart(4, "0")}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
 }
 

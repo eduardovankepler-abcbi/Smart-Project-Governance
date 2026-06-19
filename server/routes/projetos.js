@@ -3,6 +3,7 @@ const router = express.Router();
 const { sanitizeString, sanitizeNumber, sanitizeInt, normalizeDateInput } = require("../utils/parsing");
 const { logAudit } = require("../utils/audit");
 const { BASELINE_SOURCE_TYPES, createProjectBaseline } = require("../utils/baselines");
+const { assertValidProjectPayload } = require("../utils/projectValidation");
 
 module.exports = function (pool, auth) {
   const { requireAuth, requireWriteAccess, getAccessibleProjectIdsFilter } = auth;
@@ -53,6 +54,7 @@ module.exports = function (pool, auth) {
         return res.status(403).json({ error: "PMO não pode criar projetos sem atribuição do administrador", code: "PMO_PROJECT_CREATE_DENIED" });
       }
       const b = req.body;
+      assertValidProjectPayload(b);
       const projectCode = buildProjectCode(b.projectId, b.projeto);
       const businessUnitId = sanitizeInt(b.businessUnitId);
       if (!businessUnitId) return res.status(400).json({ error: "Business Unit é obrigatória", code: "BUSINESS_UNIT_REQUIRED" });
@@ -121,6 +123,9 @@ module.exports = function (pool, auth) {
       });
       res.status(201).json(mapProjeto(rows[0]));
     } catch (err) {
+      if (err.code === "PROJECT_VALIDATION") {
+        return res.status(err.status || 400).json({ error: err.message, code: err.code, errors: err.errors });
+      }
       console.error("Error creating projeto:", err);
       res.status(500).json({ error: "Erro ao criar projeto", code: "CREATE_PROJETO" });
     }
@@ -133,6 +138,7 @@ module.exports = function (pool, auth) {
         return res.status(403).json({ error: "Sem acesso a este projeto", code: "PROJECT_ACCESS_DENIED" });
       }
       const b = req.body;
+      assertValidProjectPayload(b);
       const [beforeRows] = await pool.query("SELECT * FROM projetos WHERE id = ?", [req.params.id]);
       if (!beforeRows.length) return res.status(404).json({ error: "Projeto não encontrado" });
       const projectCode = buildProjectCode(b.projectId, b.projeto);
@@ -196,6 +202,9 @@ module.exports = function (pool, auth) {
       });
       res.json(mapProjeto(rows[0]));
     } catch (err) {
+      if (err.code === "PROJECT_VALIDATION") {
+        return res.status(err.status || 400).json({ error: err.message, code: err.code, errors: err.errors });
+      }
       console.error("Error updating projeto:", err);
       res.status(500).json({ error: "Erro ao atualizar projeto", code: "UPDATE_PROJETO" });
     }
