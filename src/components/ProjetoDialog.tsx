@@ -9,6 +9,7 @@ import { useToast } from "@/hooks/use-toast";
 import * as api from "@/services/api";
 import { isApiEnabled } from "@/config/api";
 import { useData } from "@/contexts/DataContext";
+import { hasProjectValidationErrors, PROJECT_FIELD_LIMITS, type ProjectValidationErrors, validateProjectInput } from "@/utils/projectValidation";
 
 interface ProjetoDialogProps {
   open: boolean;
@@ -59,6 +60,7 @@ function buildProjectCode(name: string): string {
 export default function ProjetoDialog({ open, onOpenChange, projeto }: ProjetoDialogProps) {
   const isEdit = !!projeto;
   const [form, setForm] = useState<Omit<Projeto, "id">>(projeto ? { ...emptyProjeto, ...projeto } : { ...emptyProjeto });
+  const [errors, setErrors] = useState<ProjectValidationErrors>({});
   const [saving, setSaving] = useState(false);
   const { toast } = useToast();
   const { businessUnits, produtos, refreshProjetos, projetos, setProjetos } = useData();
@@ -67,6 +69,7 @@ export default function ProjetoDialog({ open, onOpenChange, projeto }: ProjetoDi
     if (!open) return;
     if (projeto) {
       setForm({ ...emptyProjeto, ...projeto });
+      setErrors({});
       return;
     }
     setForm({
@@ -76,42 +79,68 @@ export default function ProjetoDialog({ open, onOpenChange, projeto }: ProjetoDi
       produtoId: undefined,
       produtoName: "",
     });
+    setErrors({});
   }, [open, projeto, businessUnits]);
 
   const handleOpenChange = (value: boolean) => {
-    if (value && projeto) setForm({ ...emptyProjeto, ...projeto });
-    else if (value) setForm({
-      ...emptyProjeto,
-      businessUnitId: businessUnits[0]?.id,
-      businessUnitName: businessUnits[0]?.nome || "",
-      produtoId: undefined,
-      produtoName: "",
-    });
+    if (value && projeto) {
+      setForm({ ...emptyProjeto, ...projeto });
+      setErrors({});
+    } else if (value) {
+      setForm({
+        ...emptyProjeto,
+        businessUnitId: businessUnits[0]?.id,
+        businessUnitName: businessUnits[0]?.nome || "",
+        produtoId: undefined,
+        produtoName: "",
+      });
+      setErrors({});
+    }
     onOpenChange(value);
   };
 
-  const set = (key: keyof Omit<Projeto, "id">, value: string | number) => setForm((current) => ({ ...current, [key]: value }));
+  const set = (key: keyof Omit<Projeto, "id">, value: string | number) => {
+    setForm((current) => ({ ...current, [key]: value }));
+    setErrors((current) => {
+      if (!current[key]) return current;
+      const next = { ...current };
+      delete next[key];
+      return next;
+    });
+  };
+
+  const setFieldError = (key: keyof ProjectValidationErrors, message: string) => {
+    setErrors((current) => ({ ...current, [key]: message }));
+  };
+
+  const fieldError = (key: keyof ProjectValidationErrors) => errors[key];
+
+  const errorClass = (key: keyof ProjectValidationErrors) => fieldError(key) ? "border-destructive focus-visible:ring-destructive" : "";
+
+  const renderFieldError = (key: keyof ProjectValidationErrors) => fieldError(key) ? (
+    <p className="mt-1 text-xs text-destructive">{fieldError(key)}</p>
+  ) : null;
 
   const handleSave = async () => {
-    if (!form.projeto.trim()) {
-      toast({ title: "Erro", description: "Nome do projeto é obrigatório", variant: "destructive" });
-      return;
-    }
-    if (!form.businessUnitId) {
-      toast({ title: "Erro", description: "Business Unit é obrigatória", variant: "destructive" });
+    const validationErrors = validateProjectInput(form);
+    setErrors(validationErrors);
+    if (hasProjectValidationErrors(validationErrors)) {
+      toast({ title: "Revise os campos destacados", description: "Algumas informações do projeto precisam ser ajustadas antes de salvar.", variant: "destructive" });
       return;
     }
 
     const selectedBusinessUnit = businessUnits.find((item) => item.id === Number(form.businessUnitId));
     if (!selectedBusinessUnit) {
-      toast({ title: "Erro", description: "Business Unit inválida", variant: "destructive" });
+      setFieldError("businessUnitId", "Business Unit inválida.");
+      toast({ title: "Revise os campos destacados", description: "A Business Unit selecionada não foi encontrada.", variant: "destructive" });
       return;
     }
     const selectedProduto = form.produtoId
       ? produtos.find((item) => item.id === Number(form.produtoId))
       : undefined;
     if (form.produtoId && !selectedProduto) {
-      toast({ title: "Erro", description: "Produto inválido", variant: "destructive" });
+      setFieldError("produtoId", "Produto inválido.");
+      toast({ title: "Revise os campos destacados", description: "O produto selecionado não foi encontrado.", variant: "destructive" });
       return;
     }
 
@@ -125,11 +154,8 @@ export default function ProjetoDialog({ open, onOpenChange, projeto }: ProjetoDi
     };
 
     if (selectedProduto && selectedProduto.businessUnitId && Number(selectedProduto.businessUnitId) !== Number(form.businessUnitId)) {
-      toast({
-        title: "Erro",
-        description: "O produto selecionado deve pertencer à mesma unidade de negócio do projeto",
-        variant: "destructive",
-      });
+      setFieldError("produtoId", "O produto selecionado deve pertencer à mesma unidade de negócio do projeto.");
+      toast({ title: "Revise os campos destacados", description: "O produto deve pertencer à mesma unidade de negócio do projeto.", variant: "destructive" });
       return;
     }
 
@@ -166,15 +192,37 @@ export default function ProjetoDialog({ open, onOpenChange, projeto }: ProjetoDi
         <div className="grid grid-cols-2 gap-4 py-4">
           <div>
             <Label>ID do projeto *</Label>
-            <Input value={form.projectId || ""} onChange={(e) => set("projectId", e.target.value.toUpperCase())} placeholder="Ex: PRJ-ERP-001" />
+            <Input
+              value={form.projectId || ""}
+              maxLength={PROJECT_FIELD_LIMITS.projectId}
+              aria-invalid={!!fieldError("projectId")}
+              className={errorClass("projectId")}
+              onChange={(e) => set("projectId", e.target.value.toUpperCase())}
+              placeholder="Ex: PRJ-ERP-001"
+            />
+            {renderFieldError("projectId")}
           </div>
           <div>
             <Label>Nome do Projeto *</Label>
-            <Input value={form.projeto} onChange={(e) => set("projeto", e.target.value)} />
+            <Input
+              value={form.projeto}
+              maxLength={PROJECT_FIELD_LIMITS.projeto}
+              aria-invalid={!!fieldError("projeto")}
+              className={errorClass("projeto")}
+              onChange={(e) => set("projeto", e.target.value)}
+            />
+            {renderFieldError("projeto")}
           </div>
           <div className="col-span-2">
             <Label>Descrição</Label>
-            <Input value={form.descricao} onChange={(e) => set("descricao", e.target.value)} />
+            <Input
+              value={form.descricao}
+              maxLength={PROJECT_FIELD_LIMITS.descricao}
+              aria-invalid={!!fieldError("descricao")}
+              className={errorClass("descricao")}
+              onChange={(e) => set("descricao", e.target.value)}
+            />
+            {renderFieldError("descricao")}
           </div>
           <div>
             <Label>Business Unit (BU) *</Label>
@@ -188,8 +236,14 @@ export default function ProjetoDialog({ open, onOpenChange, projeto }: ProjetoDi
                 produtoId: produtoAtual && Number(produtoAtual.businessUnitId) === Number(value) ? current.produtoId : undefined,
                 produtoName: produtoAtual && Number(produtoAtual.businessUnitId) === Number(value) ? current.produtoName || "" : "",
               }));
+              setErrors((current) => {
+                const next = { ...current };
+                delete next.businessUnitId;
+                delete next.produtoId;
+                return next;
+              });
             }}>
-              <SelectTrigger><SelectValue placeholder="Selecione a BU" /></SelectTrigger>
+              <SelectTrigger className={errorClass("businessUnitId")} aria-invalid={!!fieldError("businessUnitId")}><SelectValue placeholder="Selecione a BU" /></SelectTrigger>
               <SelectContent>
                 {businessUnits.map((item) => (
                   <SelectItem key={item.id} value={String(item.id)}>
@@ -198,6 +252,7 @@ export default function ProjetoDialog({ open, onOpenChange, projeto }: ProjetoDi
                 ))}
               </SelectContent>
             </Select>
+            {renderFieldError("businessUnitId")}
           </div>
           <div>
             <Label>Tipo de Projeto *</Label>
@@ -213,6 +268,12 @@ export default function ProjetoDialog({ open, onOpenChange, projeto }: ProjetoDi
               onValueChange={(value) => {
                 if (value === "none") {
                   setForm((current) => ({ ...current, produtoId: undefined, produtoName: "" }));
+                  setErrors((current) => {
+                    if (!current.produtoId) return current;
+                    const next = { ...current };
+                    delete next.produtoId;
+                    return next;
+                  });
                   return;
                 }
                 const selected = produtos.find((item) => item.id === Number(value));
@@ -221,9 +282,15 @@ export default function ProjetoDialog({ open, onOpenChange, projeto }: ProjetoDi
                   produtoId: Number(value),
                   produtoName: selected?.nome || "",
                 }));
+                setErrors((current) => {
+                  if (!current.produtoId) return current;
+                  const next = { ...current };
+                  delete next.produtoId;
+                  return next;
+                });
               }}
             >
-              <SelectTrigger><SelectValue placeholder="Selecione um produto" /></SelectTrigger>
+              <SelectTrigger className={errorClass("produtoId")} aria-invalid={!!fieldError("produtoId")}><SelectValue placeholder="Selecione um produto" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="none">Sem produto vinculado</SelectItem>
                 {produtosDaBu.map((item) => (
@@ -234,10 +301,18 @@ export default function ProjetoDialog({ open, onOpenChange, projeto }: ProjetoDi
               </SelectContent>
             </Select>
             <p className="mt-1 text-xs text-muted-foreground">Mostra apenas produtos da unidade de negócio selecionada.</p>
+            {renderFieldError("produtoId")}
           </div>
           <div>
             <Label>Responsável principal</Label>
-            <Input value={form.responsavel} onChange={(e) => set("responsavel", e.target.value)} />
+            <Input
+              value={form.responsavel}
+              maxLength={PROJECT_FIELD_LIMITS.responsavel}
+              aria-invalid={!!fieldError("responsavel")}
+              className={errorClass("responsavel")}
+              onChange={(e) => set("responsavel", e.target.value)}
+            />
+            {renderFieldError("responsavel")}
           </div>
           <div>
             <Label>Prioridade</Label>
@@ -255,39 +330,116 @@ export default function ProjetoDialog({ open, onOpenChange, projeto }: ProjetoDi
           </div>
           <div>
             <Label>FTEs previstos</Label>
-            <Input type="number" step="0.5" value={form.ftes} onChange={(e) => set("ftes", parseFloat(e.target.value) || 0)} />
+            <Input
+              type="number"
+              step="0.5"
+              min={0}
+              max={PROJECT_FIELD_LIMITS.ftes}
+              value={form.ftes}
+              aria-invalid={!!fieldError("ftes")}
+              className={errorClass("ftes")}
+              onChange={(e) => set("ftes", parseFloat(e.target.value) || 0)}
+            />
+            {renderFieldError("ftes")}
           </div>
           <div>
             <Label>Início Previsto</Label>
-            <Input type="date" value={form.dataInicioPlanej || ""} onChange={(e) => set("dataInicioPlanej", e.target.value)} />
+            <Input
+              type="date"
+              value={form.dataInicioPlanej || ""}
+              aria-invalid={!!fieldError("dataInicioPlanej")}
+              className={errorClass("dataInicioPlanej")}
+              onChange={(e) => set("dataInicioPlanej", e.target.value)}
+            />
+            {renderFieldError("dataInicioPlanej")}
           </div>
           <div>
             <Label>Início Real</Label>
-            <Input type="date" value={form.dataInicio || ""} onChange={(e) => set("dataInicio", e.target.value)} />
+            <Input
+              type="date"
+              value={form.dataInicio || ""}
+              aria-invalid={!!fieldError("dataInicio")}
+              className={errorClass("dataInicio")}
+              onChange={(e) => set("dataInicio", e.target.value)}
+            />
+            {renderFieldError("dataInicio")}
           </div>
           <div>
             <Label>Fim Previsto</Label>
-            <Input type="date" value={form.dataFimPlanej || ""} onChange={(e) => set("dataFimPlanej", e.target.value)} />
+            <Input
+              type="date"
+              value={form.dataFimPlanej || ""}
+              aria-invalid={!!fieldError("dataFimPlanej")}
+              className={errorClass("dataFimPlanej")}
+              onChange={(e) => set("dataFimPlanej", e.target.value)}
+            />
+            {renderFieldError("dataFimPlanej")}
           </div>
           <div>
             <Label>Fim Real</Label>
-            <Input type="date" value={form.dataFimReal || ""} onChange={(e) => set("dataFimReal", e.target.value)} />
+            <Input
+              type="date"
+              value={form.dataFimReal || ""}
+              aria-invalid={!!fieldError("dataFimReal")}
+              className={errorClass("dataFimReal")}
+              onChange={(e) => set("dataFimReal", e.target.value)}
+            />
+            {renderFieldError("dataFimReal")}
           </div>
           <div>
             <Label>Custo planejado</Label>
-            <Input type="number" step="0.01" value={form.valorPrevisto} onChange={(e) => set("valorPrevisto", parseFloat(e.target.value) || 0)} />
+            <Input
+              type="number"
+              step="0.01"
+              min={0}
+              max={PROJECT_FIELD_LIMITS.money}
+              value={form.valorPrevisto}
+              aria-invalid={!!fieldError("valorPrevisto")}
+              className={errorClass("valorPrevisto")}
+              onChange={(e) => set("valorPrevisto", parseFloat(e.target.value) || 0)}
+            />
+            {renderFieldError("valorPrevisto")}
           </div>
           <div>
             <Label>Orçamento aprovado</Label>
-            <Input type="number" step="0.01" value={form.orcamentoAprovado || 0} onChange={(e) => set("orcamentoAprovado", parseFloat(e.target.value) || 0)} />
+            <Input
+              type="number"
+              step="0.01"
+              min={0}
+              max={PROJECT_FIELD_LIMITS.money}
+              value={form.orcamentoAprovado || 0}
+              aria-invalid={!!fieldError("orcamentoAprovado")}
+              className={errorClass("orcamentoAprovado")}
+              onChange={(e) => set("orcamentoAprovado", parseFloat(e.target.value) || 0)}
+            />
+            {renderFieldError("orcamentoAprovado")}
           </div>
           <div>
             <Label>Valor Gasto</Label>
-            <Input type="number" step="0.01" value={form.valorGasto} onChange={(e) => set("valorGasto", parseFloat(e.target.value) || 0)} />
+            <Input
+              type="number"
+              step="0.01"
+              min={0}
+              max={PROJECT_FIELD_LIMITS.money}
+              value={form.valorGasto}
+              aria-invalid={!!fieldError("valorGasto")}
+              className={errorClass("valorGasto")}
+              onChange={(e) => set("valorGasto", parseFloat(e.target.value) || 0)}
+            />
+            {renderFieldError("valorGasto")}
           </div>
           <div>
             <Label>Conclusão física (%)</Label>
-            <Input type="number" min={0} max={100} value={form.conclusao} onChange={(e) => set("conclusao", parseFloat(e.target.value) || 0)} />
+            <Input
+              type="number"
+              min={0}
+              max={100}
+              value={form.conclusao}
+              aria-invalid={!!fieldError("conclusao")}
+              className={errorClass("conclusao")}
+              onChange={(e) => set("conclusao", parseFloat(e.target.value) || 0)}
+            />
+            {renderFieldError("conclusao")}
           </div>
         </div>
         <DialogFooter>
