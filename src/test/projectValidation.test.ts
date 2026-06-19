@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseProjectDate, PROJECT_FIELD_LIMITS, validateProjectInput } from "@/utils/projectValidation";
+import { formatProjectDateForInput, parseProjectDate, PROJECT_FIELD_LIMITS, validateProjectInput } from "@/utils/projectValidation";
 
 const validProject = {
   projectId: "PRJ-001",
@@ -54,6 +54,13 @@ describe("project validation", () => {
   it("accepts ISO and pt-BR dates", () => {
     expect(parseProjectDate("2026-06-19")?.toISOString().slice(0, 10)).toBe("2026-06-19");
     expect(parseProjectDate("19/06/2026")?.toISOString().slice(0, 10)).toBe("2026-06-19");
+  });
+
+  it("formats legacy slash dates for date inputs", () => {
+    expect(formatProjectDateForInput("2026-06-19")).toBe("2026-06-19");
+    expect(formatProjectDateForInput("19/06/2026")).toBe("2026-06-19");
+    expect(formatProjectDateForInput("1/16/25")).toBe("2025-01-16");
+    expect(formatProjectDateForInput("31/02/2026")).toBe("");
   });
 
   it("rejects out-of-range numeric values", () => {

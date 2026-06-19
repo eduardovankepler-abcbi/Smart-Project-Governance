@@ -34,8 +34,10 @@ export function parseProjectDate(value?: string) {
 
   const slash = raw.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/);
   if (slash) {
-    const day = Number(slash[1]);
-    const month = Number(slash[2]);
+    const first = Number(slash[1]);
+    const second = Number(slash[2]);
+    const day = second > 12 && first <= 12 ? second : first;
+    const month = second > 12 && first <= 12 ? first : second;
     let year = Number(slash[3]);
     if (year < 100) year += 2000;
     const parsed = new Date(Date.UTC(year, month - 1, day));
@@ -44,6 +46,11 @@ export function parseProjectDate(value?: string) {
   }
 
   return null;
+}
+
+export function formatProjectDateForInput(value?: string) {
+  const parsed = parseProjectDate(value);
+  return parsed ? parsed.toISOString().slice(0, 10) : "";
 }
 
 function validateTextLength(errors: ProjectValidationErrors, field: keyof ProjectInput, label: string, value: unknown, maxLength: number) {

@@ -9,7 +9,7 @@ import { useToast } from "@/hooks/use-toast";
 import * as api from "@/services/api";
 import { isApiEnabled } from "@/config/api";
 import { useData } from "@/contexts/DataContext";
-import { hasProjectValidationErrors, PROJECT_FIELD_LIMITS, type ProjectValidationErrors, validateProjectInput } from "@/utils/projectValidation";
+import { formatProjectDateForInput, hasProjectValidationErrors, PROJECT_FIELD_LIMITS, type ProjectValidationErrors, validateProjectInput } from "@/utils/projectValidation";
 
 interface ProjetoDialogProps {
   open: boolean;
@@ -57,6 +57,16 @@ function buildProjectCode(name: string): string {
   return `PRJ-${normalized || Date.now()}`;
 }
 
+function prepareProjectForForm(project: Omit<Projeto, "id">): Omit<Projeto, "id"> {
+  return {
+    ...project,
+    dataInicioPlanej: formatProjectDateForInput(project.dataInicioPlanej),
+    dataFimPlanej: formatProjectDateForInput(project.dataFimPlanej),
+    dataInicio: formatProjectDateForInput(project.dataInicio),
+    dataFimReal: formatProjectDateForInput(project.dataFimReal),
+  };
+}
+
 export default function ProjetoDialog({ open, onOpenChange, projeto }: ProjetoDialogProps) {
   const isEdit = !!projeto;
   const [form, setForm] = useState<Omit<Projeto, "id">>(projeto ? { ...emptyProjeto, ...projeto } : { ...emptyProjeto });
@@ -68,7 +78,7 @@ export default function ProjetoDialog({ open, onOpenChange, projeto }: ProjetoDi
   useEffect(() => {
     if (!open) return;
     if (projeto) {
-      setForm({ ...emptyProjeto, ...projeto });
+      setForm(prepareProjectForForm({ ...emptyProjeto, ...projeto }));
       setErrors({});
       return;
     }
@@ -84,7 +94,7 @@ export default function ProjetoDialog({ open, onOpenChange, projeto }: ProjetoDi
 
   const handleOpenChange = (value: boolean) => {
     if (value && projeto) {
-      setForm({ ...emptyProjeto, ...projeto });
+      setForm(prepareProjectForForm({ ...emptyProjeto, ...projeto }));
       setErrors({});
     } else if (value) {
       setForm({
