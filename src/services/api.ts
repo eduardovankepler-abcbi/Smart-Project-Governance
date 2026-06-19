@@ -169,6 +169,20 @@ const IMPORT_CONFIRMATION_PHRASES = {
   msProject: "SUBSTITUIR CRONOGRAMA",
 } as const;
 
+export class ApiError extends Error {
+  status: number;
+  code?: string;
+  errors?: Record<string, string>;
+
+  constructor(message: string, options: { status: number; code?: string; errors?: Record<string, string> }) {
+    super(message);
+    this.name = "ApiError";
+    this.status = options.status;
+    this.code = options.code;
+    this.errors = options.errors;
+  }
+}
+
 function getStoredToken(): string {
   if (typeof window === "undefined") return "";
   return window.localStorage.getItem(AUTH_TOKEN_STORAGE_KEY) || "";
@@ -188,7 +202,11 @@ async function fetchJson<T>(path: string, options?: RequestInit): Promise<T> {
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
-    throw new Error(err.error || `API error: ${res.status}`);
+    throw new ApiError(err.error || `API error: ${res.status}`, {
+      status: res.status,
+      code: err.code,
+      errors: err.errors,
+    });
   }
   return res.json();
 }

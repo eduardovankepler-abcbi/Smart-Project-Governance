@@ -131,6 +131,13 @@ export default function ProjetoDialog({ open, onOpenChange, projeto }: ProjetoDi
     <p className="mt-1 text-xs text-destructive">{fieldError(key)}</p>
   ) : null;
 
+  const applyServerValidationErrors = (error: unknown) => {
+    if (!(error instanceof api.ApiError) || error.code !== "PROJECT_VALIDATION" || !error.errors) return false;
+    setErrors(error.errors as ProjectValidationErrors);
+    toast({ title: "Revise os campos destacados", description: "O servidor recusou alguns dados do projeto. Ajuste os campos indicados.", variant: "destructive" });
+    return true;
+  };
+
   const handleSave = async () => {
     const validationErrors = validateProjectInput(form);
     setErrors(validationErrors);
@@ -185,6 +192,7 @@ export default function ProjetoDialog({ open, onOpenChange, projeto }: ProjetoDi
       toast({ title: isEdit ? "Projeto atualizado" : "Projeto criado" });
       onOpenChange(false);
     } catch (e: unknown) {
+      if (applyServerValidationErrors(e)) return;
       toast({ title: "Erro", description: (e as Error).message, variant: "destructive" });
     } finally {
       setSaving(false);
