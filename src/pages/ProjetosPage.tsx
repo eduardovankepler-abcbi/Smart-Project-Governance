@@ -239,7 +239,30 @@ export default function ProjetosPage() {
       const finance = calculateProjectFinancialMetrics(p);
       return [p.projectId || "", p.businessUnitName || "", p.produtoName || "", p.projeto, p.responsavel, p.prioridade, p.status, formatDateForExport(p.dataInicioPlanej), formatDateForExport(p.dataFimPlanej), `${p.conclusao}%`, formatCurrency(finance.plannedCost), formatCurrency(finance.approvedBudget), formatCurrency(finance.spent), formatCurrency(finance.eac), formatCurrency(finance.etc), formatCurrency(finance.projectedBalance), FINANCIAL_STATUS_LABELS[finance.status]];
     });
-    exportToPdf("Relatório de Projetos", headers, rows, "projetos");
+    exportToPdf("Relatório de Projetos", headers, rows, "projetos", {
+      format: "a3",
+      fontSize: 6,
+      cellPadding: 1.4,
+      columnStyles: {
+        0: { cellWidth: 22 },
+        1: { cellWidth: 24 },
+        2: { cellWidth: 24 },
+        3: { cellWidth: 40 },
+        4: { cellWidth: 30 },
+        5: { cellWidth: 18 },
+        6: { cellWidth: 22 },
+        7: { cellWidth: 18, halign: "center" },
+        8: { cellWidth: 18, halign: "center" },
+        9: { cellWidth: 16, halign: "right" },
+        10: { cellWidth: 24, halign: "right" },
+        11: { cellWidth: 24, halign: "right" },
+        12: { cellWidth: 24, halign: "right" },
+        13: { cellWidth: 22, halign: "right" },
+        14: { cellWidth: 22, halign: "right" },
+        15: { cellWidth: 24, halign: "right" },
+        16: { cellWidth: 24 },
+      },
+    });
   };
 
   const handleExportExcel = () => {
