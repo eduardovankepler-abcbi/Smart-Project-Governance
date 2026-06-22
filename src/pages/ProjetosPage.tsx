@@ -21,6 +21,7 @@ import type { Projeto, Tarefa } from "@/data/projectData";
 import { getTaskBusinessId, getTaskDisplayHierarchy } from "@/utils/taskIdentity";
 import { getTasksForProject, getTaskResourceNames } from "@/utils/projectModel";
 import { calculateProjectFinancialMetrics, type FinancialStatus } from "@/utils/financialMetrics";
+import { formatDateForDisplay } from "@/utils/dateUtils";
 
 function StatusBadge({ status }: { status: string }) {
   const color = getStatusColor(status);
@@ -77,6 +78,10 @@ function compareTaskHierarchy(a: Tarefa, b: Tarefa) {
     if (aValue !== bValue) return aValue - bValue;
   }
   return String(a.tarefa || "").localeCompare(String(b.tarefa || ""));
+}
+
+function displayDate(value?: string) {
+  return formatDateForDisplay(value) || "—";
 }
 
 function buildProjectTaskTree(projectTasks: Tarefa[]): ProjectTaskNode[] {
@@ -288,7 +293,7 @@ export default function ProjetosPage() {
                     {task.tarefa}
                   </p>
                   <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
-                    <span>{task.dataInicioPlanej || "—"} → {task.dataFimPlanej || "—"}</span>
+                    <span>{displayDate(task.dataInicioPlanej)} → {displayDate(task.dataFimPlanej)}</span>
                     {hasChildren ? (
                       <Badge variant="secondary" className="text-[10px]">
                         {task.children.length} subitem(ns)
@@ -459,10 +464,10 @@ export default function ProjetosPage() {
                       <span><strong className="text-foreground">Responsável:</strong> {p.responsavel}</span>
                       <span><strong className="text-foreground">Produto:</strong> {p.produtoName || "—"}</span>
                       <span><strong className="text-foreground">FTEs previstos:</strong> {p.ftes}</span>
-                      <span><strong className="text-foreground">Início Previsto:</strong> {p.dataInicioPlanej || "—"}</span>
-                      <span><strong className="text-foreground">Fim Previsto:</strong> {p.dataFimPlanej || "—"}</span>
-                      <span><strong className="text-foreground">Início Real:</strong> {p.dataInicio || "—"}</span>
-                      <span><strong className="text-foreground">Fim Real:</strong> {p.dataFimReal || "—"}</span>
+                      <span><strong className="text-foreground">Início Previsto:</strong> {displayDate(p.dataInicioPlanej)}</span>
+                      <span><strong className="text-foreground">Fim Previsto:</strong> {displayDate(p.dataFimPlanej)}</span>
+                      <span><strong className="text-foreground">Início Real:</strong> {displayDate(p.dataInicio)}</span>
+                      <span><strong className="text-foreground">Fim Real:</strong> {displayDate(p.dataFimReal)}</span>
                     </div>
                   </div>
 
