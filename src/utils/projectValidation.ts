@@ -1,4 +1,5 @@
 import type { Projeto } from "@/data/projectData";
+import { formatDateForInput, parseFlexibleDate } from "@/utils/dateUtils";
 
 type ProjectInput = Partial<Omit<Projeto, "id">>;
 
@@ -18,40 +19,8 @@ function normalizeNumber(value: unknown) {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
-export function parseProjectDate(value?: string) {
-  const raw = String(value || "").trim();
-  if (!raw) return null;
-
-  const iso = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
-  if (iso) {
-    const year = Number(iso[1]);
-    const month = Number(iso[2]);
-    const day = Number(iso[3]);
-    const parsed = new Date(Date.UTC(year, month - 1, day));
-    if (Number.isNaN(parsed.getTime()) || parsed.getUTCFullYear() !== year || parsed.getUTCMonth() !== month - 1 || parsed.getUTCDate() !== day) return null;
-    return parsed;
-  }
-
-  const slash = raw.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/);
-  if (slash) {
-    const first = Number(slash[1]);
-    const second = Number(slash[2]);
-    const day = second > 12 && first <= 12 ? second : first;
-    const month = second > 12 && first <= 12 ? first : second;
-    let year = Number(slash[3]);
-    if (year < 100) year += 2000;
-    const parsed = new Date(Date.UTC(year, month - 1, day));
-    if (Number.isNaN(parsed.getTime()) || parsed.getUTCFullYear() !== year || parsed.getUTCMonth() !== month - 1 || parsed.getUTCDate() !== day) return null;
-    return parsed;
-  }
-
-  return null;
-}
-
-export function formatProjectDateForInput(value?: string) {
-  const parsed = parseProjectDate(value);
-  return parsed ? parsed.toISOString().slice(0, 10) : "";
-}
+export const parseProjectDate = parseFlexibleDate;
+export const formatProjectDateForInput = formatDateForInput;
 
 function validateTextLength(errors: ProjectValidationErrors, field: keyof ProjectInput, label: string, value: unknown, maxLength: number) {
   if (String(value || "").trim().length > maxLength) {
