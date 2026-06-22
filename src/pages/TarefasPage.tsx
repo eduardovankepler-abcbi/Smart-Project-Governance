@@ -17,6 +17,14 @@ import DeleteDialog from "@/components/DeleteDialog";
 import type { Tarefa } from "@/data/projectData";
 import { formatDurationHours, getProjectTasksByName, getTaskPredecessorLabel, getTaskReleaseState, getTaskResourceLabel, getTaskResourceNames } from "@/utils/projectModel";
 import { getTaskBusinessId, getTaskDisplayHierarchy, MAX_TASK_WBS_DEPTH } from "@/utils/taskIdentity";
+import { formatDateForDisplay } from "@/utils/dateUtils";
+import {
+  buildTaskExcelRows,
+  buildTaskPdfRows,
+  TASK_EXCEL_HEADERS,
+  TASK_EXPORT_HEADERS,
+  TASK_PDF_OPTIONS,
+} from "@/utils/taskExport";
 
 function StatusDot({ status }: { status: string }) {
   const color = getStatusColor(status);
@@ -83,6 +91,10 @@ function flattenTree(nodes: TreeNode[], expanded: Set<string>): TreeNode[] {
   }
   walk(nodes);
   return result;
+}
+
+function displayDate(value?: string) {
+  return formatDateForDisplay(value) || "—";
 }
 
 export default function TarefasPage() {
@@ -202,15 +214,11 @@ export default function TarefasPage() {
   };
 
   const handleExportPdf = () => {
-    const headers = ["ID", "WBS", "Pai", "Projeto", "Tarefa", "Recursos", "Pred.", "Duração", "%", "Status"];
-    const rows = filtered.map(t => [getTaskBusinessId(t), getTaskDisplayHierarchy(t), t.parentId || "—", t.projeto, t.tarefa, getTaskResourceLabel(t), getTaskPredecessorLabel(t), formatDurationHours(t.durationMinutes || 0), `${t.percentual}%`, t.status]);
-    exportToPdf("Relatório de Tarefas", headers, rows, "tarefas");
+    exportToPdf("Relatório de Tarefas", TASK_EXPORT_HEADERS, buildTaskPdfRows(filtered), "tarefas", TASK_PDF_OPTIONS);
   };
 
   const handleExportExcel = () => {
-    const headers = ["ID", "WBS", "Pai", "Projeto", "Tarefa", "Recursos", "Predecessoras", "Duração (h)", "%", "Status"];
-    const rows = filtered.map(t => [getTaskBusinessId(t), getTaskDisplayHierarchy(t), t.parentId || "", t.projeto, t.tarefa, getTaskResourceLabel(t), getTaskPredecessorLabel(t), (t.durationMinutes || 0) / 60, t.percentual, t.status]);
-    exportToExcel(headers, rows, "tarefas", "Tarefas");
+    exportToExcel(TASK_EXCEL_HEADERS, buildTaskExcelRows(filtered), "tarefas", "Tarefas");
   };
 
   return (
@@ -336,7 +344,7 @@ export default function TarefasPage() {
                     <TableCell className="align-top text-xs text-muted-foreground">
                       <span className="line-clamp-3 break-words">{getTaskResourceLabel(t) || "—"}</span>
                     </TableCell>
-                    <TableCell className="align-top text-xs text-muted-foreground">{t.dataFimPlanej}</TableCell>
+                    <TableCell className="align-top text-xs text-muted-foreground">{displayDate(t.dataFimPlanej)}</TableCell>
                     <TableCell className="align-top text-xs text-muted-foreground">
                       <div className="break-words">{getTaskPredecessorLabel(t) || "—"}</div>
                       {releaseState.isBlocked ? (
