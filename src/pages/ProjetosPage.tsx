@@ -21,7 +21,7 @@ import type { Projeto, Tarefa } from "@/data/projectData";
 import { getTaskBusinessId, getTaskDisplayHierarchy } from "@/utils/taskIdentity";
 import { getTasksForProject, getTaskResourceNames } from "@/utils/projectModel";
 import { calculateProjectFinancialMetrics, type FinancialStatus } from "@/utils/financialMetrics";
-import { formatDateForDisplay } from "@/utils/dateUtils";
+import { formatDateForDisplay, formatDateForExport } from "@/utils/dateUtils";
 
 function StatusBadge({ status }: { status: string }) {
   const color = getStatusColor(status);
@@ -237,7 +237,7 @@ export default function ProjetosPage() {
     const headers = ["ID do Projeto", "Unidade de Negócio", "Produto", "Projeto", "Responsável", "Prioridade", "Status", "Início Prev.", "Fim Prev.", "Conclusão", "Custo Planejado", "Orçamento Aprovado", "Valor Gasto", "EAC", "ETC", "Saldo Projetado", "Saúde Financeira"];
     const rows = filtered.map((p) => {
       const finance = calculateProjectFinancialMetrics(p);
-      return [p.projectId || "", p.businessUnitName || "", p.produtoName || "", p.projeto, p.responsavel, p.prioridade, p.status, p.dataInicioPlanej, p.dataFimPlanej, `${p.conclusao}%`, formatCurrency(finance.plannedCost), formatCurrency(finance.approvedBudget), formatCurrency(finance.spent), formatCurrency(finance.eac), formatCurrency(finance.etc), formatCurrency(finance.projectedBalance), FINANCIAL_STATUS_LABELS[finance.status]];
+      return [p.projectId || "", p.businessUnitName || "", p.produtoName || "", p.projeto, p.responsavel, p.prioridade, p.status, formatDateForExport(p.dataInicioPlanej), formatDateForExport(p.dataFimPlanej), `${p.conclusao}%`, formatCurrency(finance.plannedCost), formatCurrency(finance.approvedBudget), formatCurrency(finance.spent), formatCurrency(finance.eac), formatCurrency(finance.etc), formatCurrency(finance.projectedBalance), FINANCIAL_STATUS_LABELS[finance.status]];
     });
     exportToPdf("Relatório de Projetos", headers, rows, "projetos");
   };
@@ -246,7 +246,7 @@ export default function ProjetosPage() {
     const headers = ["ID do Projeto", "Unidade de Negócio", "Produto", "Projeto", "Responsável", "Prioridade", "Status", "Início Previsto", "Fim Previsto", "Conclusão %", "Custo Planejado", "Orçamento Aprovado", "Valor Gasto", "EAC", "ETC", "Saldo Projetado", "Saúde Financeira"];
     const rows = filtered.map((p) => {
       const finance = calculateProjectFinancialMetrics(p);
-      return [p.projectId || "", p.businessUnitName || "", p.produtoName || "", p.projeto, p.responsavel, p.prioridade, p.status, p.dataInicioPlanej, p.dataFimPlanej, p.conclusao, finance.plannedCost, finance.approvedBudget, finance.spent, finance.eac, finance.etc, finance.projectedBalance, FINANCIAL_STATUS_LABELS[finance.status]];
+      return [p.projectId || "", p.businessUnitName || "", p.produtoName || "", p.projeto, p.responsavel, p.prioridade, p.status, formatDateForExport(p.dataInicioPlanej), formatDateForExport(p.dataFimPlanej), p.conclusao, finance.plannedCost, finance.approvedBudget, finance.spent, finance.eac, finance.etc, finance.projectedBalance, FINANCIAL_STATUS_LABELS[finance.status]];
     });
     exportToExcel(headers, rows, "projetos", "Projetos");
   };
