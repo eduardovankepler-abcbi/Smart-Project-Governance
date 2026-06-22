@@ -2,13 +2,13 @@ import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import ExcelJS from "exceljs";
 
-type PdfColumnStyle = {
+export type PdfColumnStyle = {
   cellWidth?: number | "auto" | "wrap";
   halign?: "left" | "center" | "right";
   overflow?: "linebreak" | "ellipsize" | "visible" | "hidden";
 };
 
-type PdfExportOptions = {
+export type PdfExportOptions = {
   format?: "a4" | "a3";
   fontSize?: number;
   cellPadding?: number;
