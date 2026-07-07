@@ -24,6 +24,7 @@ import {
 import type { Projeto, Tarefa } from "@/data/projectData";
 import { getTaskBusinessId, getTaskDisplayHierarchy } from "@/utils/taskIdentity";
 import { getTaskReleaseState, getTaskResourceNames, getTasksForProject } from "@/utils/projectModel";
+import { formatKanbanFullDate, formatKanbanShortDate } from "@/utils/kanbanDates";
 
 interface KanbanColumn {
   id: string;
@@ -31,33 +32,6 @@ interface KanbanColumn {
   tone: string;
   icon: typeof Circle;
   tasks: Tarefa[];
-}
-
-function parseDate(value?: string): Date | null {
-  if (!value) return null;
-  const parts = value.includes("/") ? value.split("/") : [];
-  if (parts.length === 3) {
-    const month = Number(parts[0]) - 1;
-    const day = Number(parts[1]);
-    let year = Number(parts[2]);
-    if (year < 100) year += 2000;
-    const date = new Date(year, month, day);
-    return Number.isNaN(date.getTime()) ? null : date;
-  }
-  const date = new Date(`${value}T00:00:00`);
-  return Number.isNaN(date.getTime()) ? null : date;
-}
-
-function formatShortDate(value?: string) {
-  const date = parseDate(value);
-  if (!date) return "Sem prazo";
-  return date.toLocaleDateString("pt-BR", { day: "2-digit", month: "short" });
-}
-
-function formatFullDate(value?: string) {
-  const date = parseDate(value);
-  if (!date) return "Não informado";
-  return date.toLocaleDateString("pt-BR", { day: "2-digit", month: "long", year: "numeric" });
 }
 
 function formatHours(value?: number) {
@@ -212,11 +186,11 @@ function TaskExpansionModal({
               ) : null}
 
               <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-                <DetailItem label="Início planejado" value={formatFullDate(task.dataInicioPlanej)} />
-                <DetailItem label="Fim planejado" value={formatFullDate(task.dataFimPlanej)} />
+                <DetailItem label="Início planejado" value={formatKanbanFullDate(task.dataInicioPlanej)} />
+                <DetailItem label="Fim planejado" value={formatKanbanFullDate(task.dataFimPlanej)} />
                 <DetailItem label="Duração" value={formatHours(task.durationMinutes ? task.durationMinutes / 60 : task.diasPlanejados * 8)} />
-                <DetailItem label="Início real" value={formatFullDate(task.dataInicioReal)} />
-                <DetailItem label="Fim real" value={formatFullDate(task.dataFimReal)} />
+                <DetailItem label="Início real" value={formatKanbanFullDate(task.dataInicioReal)} />
+                <DetailItem label="Fim real" value={formatKanbanFullDate(task.dataFimReal)} />
                 <DetailItem label="Esforço real" value={formatHours(task.esforcoReal)} />
               </div>
 
@@ -345,7 +319,7 @@ function TaskCard({ task, allTasks, projects, onExpand }: { task: Tarefa; allTas
       <div className="mt-3 flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
         <span className="inline-flex items-center gap-1">
           <CalendarClock size={12} />
-          {formatShortDate(task.dataFimPlanej)}
+          {formatKanbanShortDate(task.dataFimPlanej)}
         </span>
         <span>{Math.round(Number(task.percentual || 0))}%</span>
       </div>
