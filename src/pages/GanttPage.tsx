@@ -8,22 +8,7 @@ import { getProjectTasksByName, getTaskResourceLabel, getTaskResourceNames } fro
 import { getTaskBusinessId, getTaskDisplayHierarchy, getTaskHierarchyDepth } from "@/utils/taskIdentity";
 import { ChevronDown, ChevronRight, GitBranch, Layers3 } from "lucide-react";
 import type { Tarefa } from "@/data/projectData";
-
-function parseDate(dateStr: string): Date | null {
-  if (!dateStr) return null;
-  const parts = dateStr.split("/");
-  if (parts.length !== 3) return null;
-  const month = parseInt(parts[0]) - 1;
-  const day = parseInt(parts[1]);
-  let year = parseInt(parts[2]);
-  if (year < 100) year += 2000;
-  const d = new Date(year, month, day);
-  return isNaN(d.getTime()) ? null : d;
-}
-
-function daysBetween(a: Date, b: Date): number {
-  return Math.round((b.getTime() - a.getTime()) / (1000 * 60 * 60 * 24));
-}
+import { daysBetween, parseGanttDate } from "@/utils/ganttDates";
 
 const STATUS_COLORS: Record<string, string> = {
   "Atrasado": "bg-destructive",
@@ -73,7 +58,7 @@ function getTaskDepth(task: Tarefa): number {
 }
 
 function buildGanttRows(tasks: Tarefa[], resourceFilter: string): GanttRow[] {
-  const datedTasks = tasks.filter((task) => parseDate(task.dataInicioPlanej));
+  const datedTasks = tasks.filter((task) => parseGanttDate(task.dataInicioPlanej));
   const included = new Set<string>();
 
   datedTasks.forEach((task) => {
@@ -133,8 +118,8 @@ export default function GanttPage() {
     let min = Infinity;
     let max = -Infinity;
     ganttRows.forEach(({ task: t }) => {
-      const start = parseDate(t.dataInicioPlanej);
-      const end = parseDate(t.dataFimPlanej) || start;
+      const start = parseGanttDate(t.dataInicioPlanej);
+      const end = parseGanttDate(t.dataFimPlanej) || start;
       if (start) min = Math.min(min, start.getTime());
       if (end) max = Math.max(max, end.getTime());
     });
@@ -215,8 +200,8 @@ export default function GanttPage() {
                 </div>
 
                 {visibleRows.map(({ task: t, depth, hasChildren: rowHasChildren }) => {
-                  const start = parseDate(t.dataInicioPlanej)!;
-                  const end = parseDate(t.dataFimPlanej) || start;
+                  const start = parseGanttDate(t.dataInicioPlanej)!;
+                  const end = parseGanttDate(t.dataFimPlanej) || start;
                   const left = (daysBetween(minDate, start) / totalDays) * 100;
                   const width = Math.max((daysBetween(start, end) / totalDays) * 100, 0.5);
                   const barColor = STATUS_COLORS[t.status] || "bg-muted-foreground";
