@@ -15,6 +15,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import * as api from "@/services/api";
 import type { Comentario } from "@/data/projectData";
 import { summarizeProjectFinancials } from "@/utils/financialMetrics";
+import { formatDashboardDate, getMonthBucket } from "@/utils/dashboardDates";
 
 const COLORS = [
   "hsl(0, 78%, 45%)",
@@ -23,25 +24,6 @@ const COLORS = [
   "hsl(38, 92%, 50%)",
   "hsl(270, 60%, 55%)",
 ];
-
-function parseDate(dateStr: string): Date | null {
-  if (!dateStr) return null;
-  const parts = dateStr.split("/");
-  if (parts.length !== 3) return null;
-  const month = parseInt(parts[0]) - 1;
-  const day = parseInt(parts[1]);
-  let year = parseInt(parts[2]);
-  if (year < 100) year += 2000;
-  const d = new Date(year, month, day);
-  return isNaN(d.getTime()) ? null : d;
-}
-
-function formatDueDate(value?: string) {
-  if (!value) return "Sem prazo";
-  const date = new Date(`${value}T00:00:00`);
-  if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleDateString("pt-BR");
-}
 
 const ACTIONABLE_LABELS: Record<NonNullable<Comentario["commentType"]>, string> = {
   comment: "Comentário",
@@ -161,10 +143,9 @@ export default function DashboardPage() {
 
     const datesMap = new Map<string, number>();
     filteredTarefas.forEach(t => {
-      const d = parseDate(t.dataFimPlanej);
-      if (d) {
-        const key = `${d.getMonth() + 1}/${d.getFullYear() % 100}`;
-        datesMap.set(key, (datesMap.get(key) || 0) + 1);
+      const bucket = getMonthBucket(t.dataFimPlanej);
+      if (bucket) {
+        datesMap.set(bucket.key, (datesMap.get(bucket.key) || 0) + 1);
       }
     });
 
@@ -444,7 +425,7 @@ export default function DashboardPage() {
                               {ACTIONABLE_LABELS[type]}
                             </span>
                             {item.projectName ? <span className="text-xs text-muted-foreground">{item.projectName}</span> : null}
-                            <span className="text-xs text-muted-foreground">{formatDueDate(item.dueDate)}</span>
+                            <span className="text-xs text-muted-foreground">{formatDashboardDate(item.dueDate)}</span>
                           </div>
                           <p className="line-clamp-2 text-sm text-foreground">{item.content}</p>
                           {item.ownerName ? <p className="mt-2 text-xs text-muted-foreground">Responsável: {item.ownerName}</p> : null}

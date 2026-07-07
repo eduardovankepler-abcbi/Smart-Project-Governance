@@ -4,20 +4,9 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useData } from "@/contexts/DataContext";
+import { daysUntil, formatDashboardDate } from "@/utils/dashboardDates";
 
 const NOTIFICATION_READ_STORAGE_KEY = "abc_pm_read_notifications_v1";
-
-function parseDate(dateStr: string): Date | null {
-  if (!dateStr) return null;
-  const parts = dateStr.split("/");
-  if (parts.length !== 3) return null;
-  const month = parseInt(parts[0]) - 1;
-  const day = parseInt(parts[1]);
-  let year = parseInt(parts[2]);
-  if (year < 100) year += 2000;
-  const d = new Date(year, month, day);
-  return isNaN(d.getTime()) ? null : d;
-}
 
 interface Notification {
   id: string;
@@ -51,21 +40,18 @@ export default function NotificationBell() {
           type: "atrasada",
           tarefa: t.tarefa,
           projeto: t.projeto,
-          message: `Tarefa atrasada desde ${t.dataFimPlanej || "N/A"}`,
+          message: `Tarefa atrasada desde ${formatDashboardDate(t.dataFimPlanej, "N/A")}`,
         });
       } else if (t.status !== "Concluído" && t.status !== "Congelado") {
-        const fim = parseDate(t.dataFimPlanej);
-        if (fim) {
-          const diffDays = Math.ceil((fim.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
-          if (diffDays >= 0 && diffDays <= 7) {
-            alerts.push({
-              id: `soon-${t.id}`,
-              type: "proxima",
-              tarefa: t.tarefa,
-              projeto: t.projeto,
-              message: `Prazo em ${diffDays} dia(s) — ${t.dataFimPlanej}`,
-            });
-          }
+        const diffDays = daysUntil(t.dataFimPlanej, now);
+        if (diffDays !== null && diffDays >= 0 && diffDays <= 7) {
+          alerts.push({
+            id: `soon-${t.id}`,
+            type: "proxima",
+            tarefa: t.tarefa,
+            projeto: t.projeto,
+            message: `Prazo em ${diffDays} dia(s) — ${formatDashboardDate(t.dataFimPlanej)}`,
+          });
         }
       }
     });
