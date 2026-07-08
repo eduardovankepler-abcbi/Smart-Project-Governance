@@ -16,13 +16,7 @@ import { Badge } from "@/components/ui/badge";
 import { MessageSquare, History, Pencil, Trash2, CheckCircle2, AlertTriangle } from "lucide-react";
 import { buildTaskDisplayLabel } from "@/utils/taskIdentity";
 import { getTasksForProject } from "@/utils/projectModel";
-
-function formatDateTime(value?: string) {
-  if (!value) return "—";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleString("pt-BR");
-}
+import { formatHistoryDate, formatHistoryDateForInput, formatHistoryDateTime } from "@/utils/historyDates";
 
 function formatJsonDetails(value: unknown) {
   if (value == null || value === "") return "—";
@@ -359,11 +353,11 @@ export default function HistoricoPage() {
                         {(item.ownerName || item.dueDate) ? (
                           <div className="flex flex-wrap gap-3 text-xs text-muted-foreground">
                             {item.ownerName ? <span>Responsável: <strong className="text-foreground">{item.ownerName}</strong></span> : null}
-                            {item.dueDate ? <span>Prazo: <strong className="text-foreground">{item.dueDate}</strong></span> : null}
+                            {item.dueDate ? <span>Prazo: <strong className="text-foreground">{formatHistoryDate(item.dueDate)}</strong></span> : null}
                           </div>
                         ) : null}
                         <div className="flex flex-wrap items-center justify-between gap-3 text-xs text-muted-foreground">
-                          <span>{item.authorName || "Sistema"} · {formatDateTime(item.createdAt)}</span>
+                          <span>{item.authorName || "Sistema"} · {formatHistoryDateTime(item.createdAt)}</span>
                           {canWrite ? (
                             <div className="flex gap-2">
                               <Button
@@ -377,7 +371,7 @@ export default function HistoricoPage() {
                                   setContent(item.content);
                                   setCommentType(type);
                                   setOwnerName(item.ownerName || "");
-                                  setDueDate(item.dueDate || "");
+                                  setDueDate(formatHistoryDateForInput(item.dueDate));
                                   setResolutionStatus(status);
                                 }}
                               >
@@ -436,7 +430,7 @@ export default function HistoricoPage() {
                             <History size={16} className="text-primary" />
                             <Badge variant="outline">{item.entityType}</Badge>
                             <Badge variant="outline">{item.action}</Badge>
-                            <span className="text-xs text-muted-foreground">{formatDateTime(item.createdAt)}</span>
+                            <span className="text-xs text-muted-foreground">{formatHistoryDateTime(item.createdAt)}</span>
                           </div>
                           <p className="text-sm text-foreground">{item.summary}</p>
                           <div className="text-xs text-muted-foreground">
