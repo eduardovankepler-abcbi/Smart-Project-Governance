@@ -10,7 +10,7 @@ import { AlertTriangle, CalendarRange, CheckCircle2, Gauge, Users } from "lucide
 import { ResponsiveContainer, BarChart, Bar, CartesianGrid, XAxis, YAxis, Tooltip } from "recharts";
 import { findProjectForTask, getTaskResourceNames } from "@/utils/projectModel";
 import { normalizeMaxUnits } from "@/utils/resourceCapacity";
-import { calculateBusinessDayOverlapFactor, countWorkingDays, type CapacityPeriod } from "@/utils/capacityPlanning";
+import { calculateBusinessDayOverlapFactor, countWorkingDays, parseCapacityDate, type CapacityPeriod } from "@/utils/capacityPlanning";
 import ChartPreviewModal from "@/components/ChartPreviewModal";
 
 interface CapacityAssignment {
@@ -71,38 +71,17 @@ function addMonths(date: Date, months: number) {
   return new Date(date.getFullYear(), date.getMonth() + months, 1);
 }
 
-function parseDateValue(value?: string) {
-  if (!value) return null;
-  const raw = String(value).trim();
-  if (!raw) return null;
-  if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
-    const date = new Date(`${raw}T00:00:00`);
-    return Number.isNaN(date.getTime()) ? null : date;
-  }
-  const slashMatch = raw.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/);
-  if (slashMatch) {
-    const first = Number(slashMatch[1]);
-    const second = Number(slashMatch[2]);
-    const year = Number(slashMatch[3].length === 2 ? `20${slashMatch[3]}` : slashMatch[3]);
-    const month = first > 12 ? second : first;
-    const day = first > 12 ? first : second;
-    const date = new Date(year, month - 1, day);
-    return Number.isNaN(date.getTime()) ? null : date;
-  }
-  return null;
-}
-
 function getTaskDateRange(task: { dataInicioPlanej?: string; dataFimPlanej?: string; dataInicioReal?: string; dataFimReal?: string }) {
-  const startDate = parseDateValue(task.dataInicioPlanej) || parseDateValue(task.dataInicioReal);
-  const finishDate = parseDateValue(task.dataFimPlanej) || parseDateValue(task.dataFimReal) || startDate;
+  const startDate = parseCapacityDate(task.dataInicioPlanej) || parseCapacityDate(task.dataInicioReal);
+  const finishDate = parseCapacityDate(task.dataFimPlanej) || parseCapacityDate(task.dataFimReal) || startDate;
   return { startDate, finishDate };
 }
 
 function getPeriodFromPreset(preset: PeriodPreset, customStart: string, customEnd: string): CapacityPeriod {
   if (preset === "all") return { start: null, end: null };
   if (preset === "custom") {
-    const start = parseDateValue(customStart);
-    const end = parseDateValue(customEnd) || start;
+    const start = parseCapacityDate(customStart);
+    const end = parseCapacityDate(customEnd) || start;
     if (start && end && end.getTime() < start.getTime()) return { start: end, end: start };
     return {
       start,

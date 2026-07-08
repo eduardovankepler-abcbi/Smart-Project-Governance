@@ -1,6 +1,14 @@
+import { parseFlexibleDate } from "@/utils/dateUtils";
+
 export interface CapacityPeriod {
   start: Date | null;
   end: Date | null;
+}
+
+export function parseCapacityDate(value?: unknown) {
+  const parsed = parseFlexibleDate(value);
+  if (!parsed) return null;
+  return new Date(parsed.getUTCFullYear(), parsed.getUTCMonth(), parsed.getUTCDate());
 }
 
 function normalizeDateOnly(date: Date) {
